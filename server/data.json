@@ -1,0 +1,70 @@
+{
+  "categories": [
+    {
+      "id": "cat-tanthu",
+      "name": "Tân Thủ",
+      "slug": "tanthu",
+      "active": true,
+      "icon": "🔰",
+      "description": "Tân Thủ GIFCODE - Code trải nghiệm độc quyền cho thành viên mới"
+    },
+    {
+      "id": "cat-gifcode",
+      "name": "GIFCODE",
+      "slug": "gifcode",
+      "active": true,
+      "icon": "🎁",
+      "description": "GIFCODE VIP - Thưởng Gifcode ngẫu nhiên 50K - 500K"
+    }
+  ],
+  "gifcodes": [
+    {
+      "id": "code-1",
+      "categoryId": "cat-tanthu",
+      "code": "TANTHU-NEWVIP-88K",
+      "isUsed": false,
+      "usedBy": null,
+      "usedAt": null,
+      "createdAt": "2026-07-22T13:53:41.773Z"
+    },
+    {
+      "id": "code-2",
+      "categoryId": "cat-tanthu",
+      "code": "TANTHU-START999-50K",
+      "isUsed": false,
+      "usedBy": null,
+      "usedAt": null,
+      "createdAt": "2026-07-22T13:53:41.775Z"
+    },
+    {
+      "id": "code-3",
+      "categoryId": "cat-gifcode",
+      "code": "GIFCODE-LUCKY777-100K",
+      "isUsed": false,
+      "usedBy": null,
+      "usedAt": null,
+      "createdAt": "2026-07-22T13:53:41.775Z"
+    },
+    {
+      "id": "code-4",
+      "categoryId": "cat-gifcode",
+      "code": "GIFCODE-SUPER999-200K",
+      "isUsed": false,
+      "usedBy": null,
+      "usedAt": null,
+      "createdAt": "2026-07-22T13:53:41.775Z"
+    }
+  ],
+  "claims": [],
+  "settings": {
+    "adDurationSeconds": 15,
+    "dailyLimitPerUser": 10,
+    "botToken": "8988870338:AAH2jR6Mh60UWxXj_9F_yODIf89yqhXc3HA",
+    "adminPassword": "admin123",
+    "miniappUrl": "https://daovangcoin.com/",
+    "rulesText": "1. Mỗi lượt xem đủ video quảng cáo sẽ nhận ngay 1 Gifcode may mắn ngẫu nhiên.\n2. Mỗi mã Gifcode chỉ được sử dụng 1 lần cho tài khoản nhà cái tương ứng.\n3. Vui lòng dán mã code vào mục Khuyến Mãi của nhà cái để nhận thưởng lập tức.\n4. Nghiêm cấm sử dụng công cụ gian lận, hệ thống sẽ tự động khóa tài khoản vi phạm.",
+    "adminTelegramIds": [
+      "5301275536"
+    ]
+  }
+}

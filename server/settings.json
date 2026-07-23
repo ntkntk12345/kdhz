@@ -1,0 +1,11 @@
+{
+  "botToken": "8988870338:AAH2jR6Mh60UWxXj_9F_yODIf89yqhXc3HA",
+  "adminPassword": "admin123",
+  "miniappUrl": "https://daovangcoin.com/",
+  "adDurationSeconds": 15,
+  "dailyLimitPerUser": 10,
+  "adminTelegramIds": [
+    "5301275536"
+  ],
+  "rulesText": "1. Mỗi lượt xem đủ video quảng cáo sẽ nhận ngay 1 Gifcode may mắn ngẫu nhiên.\n2. Mỗi mã Gifcode chỉ được sử dụng 1 lần cho tài khoản tương ứng.\n3. Vui lòng dán mã code vào mục Khuyến Mãi để nhận thưởng lập tức.\n4. Nghiêm cấm sử dụng công cụ gian lận, hệ thống sẽ tự động khóa tài khoản vi phạm."
+}
