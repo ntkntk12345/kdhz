@@ -78,6 +78,40 @@ const initDb = async () => {
       )
     `);
 
+    // Referral tracking table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id TEXT PRIMARY KEY,
+        referrer_id TEXT NOT NULL,
+        referred_id TEXT NOT NULL,
+        referred_username TEXT,
+        completed INTEGER DEFAULT 0,
+        completed_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    `);
+
+    // IP view tracking table (anti-abuse)
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS ip_views (
+        id TEXT PRIMARY KEY,
+        ip TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        step INTEGER DEFAULT 1,
+        viewed_at TEXT NOT NULL
+      )
+    `);
+
+    // Browser fingerprint tracking table (anti-abuse)
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS fingerprints (
+        id TEXT PRIMARY KEY,
+        fingerprint TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        last_seen TEXT NOT NULL
+      )
+    `);
+
     // Seed default categories if empty
     const catCount = await dbGet('SELECT COUNT(*) as count FROM categories');
     if (catCount.count === 0) {
@@ -113,6 +147,11 @@ const defaultSettings = {
   adDurationSeconds: 15,
   dailyLimitPerUser: 10,
   adminTelegramIds: ['5301275536'],
+  requiredGroups: [],         // ['@groupusername1', '@groupusername2']
+  joinAllLink: '',            // Link tham gia tất cả nhóm
+  referralRewardCount: 3,     // Cần mời bao nhiêu bạn để nhận 1 code
+  referralMinVideos: 3,       // Bạn bè cần xem tối thiểu bao nhiêu video
+  maxIpViews: 5,              // 1 IP tối đa xem bao nhiêu lần (khác user)
   rulesText: '1. Mỗi lượt xem đủ video quảng cáo sẽ nhận ngay 1 Gifcode may mắn ngẫu nhiên.\n2. Mỗi mã Gifcode chỉ được sử dụng 1 lần cho tài khoản tương ứng.\n3. Vui lòng dán mã code vào mục Khuyến Mãi để nhận thưởng lập tức.\n4. Nghiêm cấm sử dụng công cụ gian lận, hệ thống sẽ tự động khóa tài khoản vi phạm.'
 };
 
@@ -123,7 +162,9 @@ function readSettings() {
       return defaultSettings;
     }
     const raw = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Merge with defaults to ensure new keys exist
+    return { ...defaultSettings, ...parsed };
   } catch (err) {
     return defaultSettings;
   }
@@ -162,6 +203,10 @@ export const db = {
         else resolve(rows || []);
       });
     });
+  },
+
+  getAllCategories: () => {
+    return dbAll('SELECT * FROM categories');
   },
 
   addCategory: async (name, description = '', icon = '🎁') => {
@@ -269,6 +314,22 @@ export const db = {
     };
   },
 
+  // Add codes to first active category (default)
+  addCodesToDefault: async (codesArray) => {
+    let category = await dbGet('SELECT * FROM categories WHERE active = 1 ORDER BY id LIMIT 1');
+    if (!category) {
+      category = { id: 'cat-tanthu', name: 'Tân Thủ' };
+    }
+    const addedCount = await db.addCodes(category.id, codesArray);
+    const availRow = await dbGet('SELECT COUNT(*) as available FROM gifcodes WHERE category_id = ? AND is_used = 0', [category.id]);
+    return {
+      success: true,
+      categoryName: category.name,
+      addedCount,
+      availableCount: availRow ? availRow.available : 0
+    };
+  },
+
   deleteCode: async (codeId) => {
     await dbRun('DELETE FROM gifcodes WHERE id = ?', [codeId]);
     return true;
@@ -338,6 +399,11 @@ export const db = {
       [claimId, userId || 'user-anon', username || 'Khách may mắn', categoryId, categoryName, selected.code, now]
     );
 
+    // Mark referral as completed if bạn bè đủ điều kiện
+    if (userId && userId !== 'user-anon' && userId !== 'user-web') {
+      await db.markReferralCompleted(userId);
+    }
+
     const newClaim = {
       id: claimId,
       userId: userId || 'user-anon',
@@ -363,6 +429,158 @@ export const db = {
     }
     const rows = await dbAll('SELECT * FROM claims ORDER BY claimed_at DESC LIMIT 50');
     return rows.map(r => ({ ...r, categoryName: r.category_name, claimedAt: r.claimed_at, userId: r.user_id }));
+  },
+
+  // ─── REFERRAL SYSTEM ─────────────────────────────────────────────────────────
+
+  // Ghi nhận lượt mời khi bạn bè join qua referral link
+  recordReferral: async (referrerId, referredId, referredUsername) => {
+    if (String(referrerId) === String(referredId)) return null; // không tự giới thiệu chính mình
+
+    // Check xem đã có record chưa
+    const existing = await dbGet('SELECT * FROM referrals WHERE referred_id = ?', [String(referredId)]);
+    if (existing) return existing; // mỗi user chỉ được mời 1 lần
+
+    const id = `ref-${Date.now()}`;
+    const now = new Date().toISOString();
+    await dbRun(
+      'INSERT INTO referrals (id, referrer_id, referred_id, referred_username, completed, created_at) VALUES (?, ?, ?, ?, 0, ?)',
+      [id, String(referrerId), String(referredId), referredUsername || '', now]
+    );
+    return { id, referrerId, referredId, completed: 0 };
+  },
+
+  // Đánh dấu referral là hoàn thành khi bạn bè xem đủ video
+  markReferralCompleted: async (referredId) => {
+    const settings = readSettings();
+    const minVideos = settings.referralMinVideos || 3;
+
+    // Đếm số video đã xem của referred user
+    const viewCount = await dbGet('SELECT COUNT(*) as cnt FROM ip_views WHERE user_id = ?', [String(referredId)]);
+    const totalViews = viewCount ? viewCount.cnt : 0;
+
+    if (totalViews >= minVideos) {
+      const now = new Date().toISOString();
+      await dbRun(
+        'UPDATE referrals SET completed = 1, completed_at = ? WHERE referred_id = ? AND completed = 0',
+        [now, String(referredId)]
+      );
+    }
+  },
+
+  // Lấy thống kê referral của 1 user
+  getReferralStats: async (userId) => {
+    const settings = readSettings();
+    const rewardCount = settings.referralRewardCount || 3;
+
+    const refs = await dbAll('SELECT * FROM referrals WHERE referrer_id = ?', [String(userId)]);
+    const completed = refs.filter(r => r.completed === 1).length;
+    const pending = refs.filter(r => r.completed === 0).length;
+    const rewardsEarned = Math.floor(completed / rewardCount);
+
+    return { total: refs.length, completed, pending, rewardsEarned, rewardCount };
+  },
+
+  // ─── IP TRACKING ─────────────────────────────────────────────────────────────
+
+  // Ghi nhận 1 lượt xem video theo IP
+  recordIpView: async (ip, userId, step) => {
+    const id = `ipv-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
+    const now = new Date().toISOString();
+    await dbRun(
+      'INSERT INTO ip_views (id, ip, user_id, step, viewed_at) VALUES (?, ?, ?, ?, ?)',
+      [id, ip, String(userId), step || 1, now]
+    );
+  },
+
+  // Kiểm tra IP có bị chặn không
+  checkIpLimit: async (ip, userId) => {
+    const settings = readSettings();
+    const maxViews = settings.maxIpViews || 5;
+
+    // Đếm số user KHÁC nhau đã dùng IP này
+    const distinctUsers = await dbGet(
+      'SELECT COUNT(DISTINCT user_id) as cnt FROM ip_views WHERE ip = ? AND user_id != ?',
+      [ip, String(userId)]
+    );
+    const otherUsers = distinctUsers ? distinctUsers.cnt : 0;
+
+    if (otherUsers >= maxViews) {
+      return { blocked: true, reason: 'ip_limit', otherUsers };
+    }
+    return { blocked: false };
+  },
+
+  // ─── FINGERPRINT TRACKING ────────────────────────────────────────────────────
+
+  // Kiểm tra fingerprint có bị chặn không
+  checkFingerprint: async (fingerprint, userId) => {
+    if (!fingerprint) return { blocked: false };
+
+    const existing = await dbGet(
+      'SELECT * FROM fingerprints WHERE fingerprint = ? AND user_id != ?',
+      [fingerprint, String(userId)]
+    );
+
+    if (existing) {
+      return { blocked: true, reason: 'fingerprint_duplicate', originalUserId: existing.user_id };
+    }
+
+    // Upsert fingerprint record
+    const now = new Date().toISOString();
+    const existing2 = await dbGet('SELECT * FROM fingerprints WHERE fingerprint = ? AND user_id = ?', [fingerprint, String(userId)]);
+    if (existing2) {
+      await dbRun('UPDATE fingerprints SET last_seen = ? WHERE fingerprint = ? AND user_id = ?', [now, fingerprint, String(userId)]);
+    } else {
+      const id = `fp-${Date.now()}`;
+      await dbRun('INSERT INTO fingerprints (id, fingerprint, user_id, last_seen) VALUES (?, ?, ?, ?)', [id, fingerprint, String(userId), now]);
+    }
+
+    return { blocked: false };
+  },
+
+  // ─── MEMBERSHIP CHECK ────────────────────────────────────────────────────────
+
+  // Lấy danh sách nhóm bắt buộc và link join all từ settings
+  getMembershipConfig: () => {
+    const settings = readSettings();
+    return {
+      requiredGroups: settings.requiredGroups || [],
+      joinAllLink: settings.joinAllLink || ''
+    };
+  },
+
+  // ─── ADMIN STATS ─────────────────────────────────────────────────────────────
+
+  getAdminStats: async () => {
+    const categories = await dbAll('SELECT * FROM categories');
+    const stats = [];
+
+    for (const cat of categories) {
+      const total = await dbGet('SELECT COUNT(*) as cnt FROM gifcodes WHERE category_id = ?', [cat.id]);
+      const available = await dbGet('SELECT COUNT(*) as cnt FROM gifcodes WHERE category_id = ? AND is_used = 0', [cat.id]);
+      const used = await dbGet('SELECT COUNT(*) as cnt FROM gifcodes WHERE category_id = ? AND is_used = 1', [cat.id]);
+      stats.push({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        total: total ? total.cnt : 0,
+        available: available ? available.cnt : 0,
+        used: used ? used.cnt : 0
+      });
+    }
+
+    const totalClaims = await dbGet('SELECT COUNT(*) as cnt FROM claims');
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayClaims = await dbGet(`SELECT COUNT(*) as cnt FROM claims WHERE claimed_at LIKE '${todayStr}%'`);
+    const totalReferrals = await dbGet('SELECT COUNT(*) as cnt FROM referrals WHERE completed = 1');
+
+    return {
+      categories: stats,
+      totalClaims: totalClaims ? totalClaims.cnt : 0,
+      todayClaims: todayClaims ? todayClaims.cnt : 0,
+      completedReferrals: totalReferrals ? totalReferrals.cnt : 0
+    };
   },
 
   getSettings: () => {

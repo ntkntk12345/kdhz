@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — GiftCode MiniApp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --bg-card: #111113;
+      --bg-input: #1a1a1e;
+      --border: #2a2a30;
+      --amber: #f59e0b;
+      --amber-light: #fcd34d;
+      --amber-bg: rgba(245,158,11,0.08);
+      --text: #f4f4f5;
+      --text-secondary: #a1a1aa;
+      --text-muted: #52525b;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --radius: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* LOGIN */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .login-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px; width: 100%; max-width: 380px;
+      box-shadow: 0 0 60px rgba(245,158,11,0.05);
+    }
+    .login-logo { font-size: 40px; text-align: center; margin-bottom: 16px; }
+    .login-title { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; }
+    .login-sub { font-size: 13px; color: var(--text-secondary); text-align: center; margin-bottom: 28px; }
+
+    /* LAYOUT */
+    #app { display: none; }
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+      background: var(--bg-card); border-right: 1px solid var(--border);
+      padding: 20px 0; display: flex; flex-direction: column; z-index: 100;
+    }
+    .sidebar-brand { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .sidebar-brand h1 { font-size: 15px; font-weight: 800; color: var(--amber-light); }
+    .sidebar-brand p { font-size: 11px; color: var(--text-muted); }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+      cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      transition: all 0.15s; border-radius: 0;
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    .nav-item.active { color: var(--amber-light); background: var(--amber-bg); border-right: 2px solid var(--amber); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    .main-content { margin-left: 220px; padding: 28px; min-height: 100vh; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-title { font-size: 20px; font-weight: 800; margin-bottom: 20px; }
+
+    /* CARDS */
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .stat-val { font-size: 28px; font-weight: 800; color: var(--amber-light); }
+    .stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber-light); border: 1px solid rgba(245,158,11,0.2); }
+
+    /* FORMS */
+    input, textarea, select {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; color: var(--text);
+      font-family: 'Outfit', sans-serif; font-size: 13px;
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--amber); }
+    textarea { resize: vertical; min-height: 120px; }
+    label { font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+    .form-group { margin-bottom: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: 8px; border: none;
+      font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-amber { background: var(--amber); color: #000; }
+    .btn-amber:hover { background: var(--amber-light); }
+    .btn-red { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-red:hover { background: rgba(239,68,68,0.2); }
+    .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--amber); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* TOAST */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 18px; font-size: 13px; font-weight: 500;
+      transform: translateY(80px); opacity: 0; transition: all 0.3s;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: var(--green); color: var(--green); }
+    #toast.error { border-color: var(--red); color: var(--red); }
+
+    /* MISC */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .mt-12 { margin-top: 12px; }
+    .logout-btn { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+    code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🎁</div>
+    <div class="login-title">Admin Panel</div>
+    <div class="login-sub">GiftCode MiniApp Dashboard</div>
+    <div class="form-group">
+      <label>Mật khẩu Admin</label>
+      <input type="password" id="login-pw" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="btn btn-amber" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">
+      🔓 ĐĂNG NHẬP
+    </button>
+    <div id="login-error" style="color:var(--red);font-size:12px;text-align:center;margin-top:10px;display:none">Sai mật khẩu!</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <h1>🎁 GiftCode Admin</h1>
+      <p>daovangcoin.com</p>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showPage('codes')"><span class="nav-icon">🎫</span> Quản lý Code</div>
+    <div class="nav-item" onclick="showPage('addcode')"><span class="nav-icon">➕</span> Thêm Code</div>
+    <div class="nav-item" onclick="showPage('categories')"><span class="nav-icon">📂</span> Danh mục</div>
+    <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙️</span> Cài đặt</div>
+    <div class="logout-btn">
+      <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="doLogout()">🚪 Đăng xuất</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">📊 Dashboard</div>
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-box"><div class="stat-val" id="stat-total-codes">—</div><div class="stat-label">Tổng code đã nạp</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-avail-codes">—</div><div class="stat-label">Code còn lại</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-total-claims">—</div><div class="stat-label">Tổng lượt nhận</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-today-claims">—</div><div class="stat-label">Nhận hôm nay</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-referrals">—</div><div class="stat-label">Referral hoàn thành</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Thống kê theo danh mục</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Danh mục</th><th>Tổng</th><th>Còn lại</th><th>Đã phát</th></tr></thead>
+          <tbody id="cat-stats-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- QUẢN LÝ CODE -->
+    <div class="page" id="page-codes">
+      <div class="page-title">🎫 Quản lý Code</div>
+      <div class="card">
+        <div class="section-header">
+          <div class="flex">
+            <label style="margin:0">Lọc danh mục:</label>
+            <select id="code-filter-cat" style="width:200px" onchange="loadCodes()">
+              <option value="">-- Tất cả --</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadCodes()">🔄 Tải lại</button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Code</th><th>Danh mục</th><th>Trạng thái</th><th>Ngày tạo</th><th></th></tr></thead>
+          <tbody id="codes-tbody"></tbody>
+        </table></div>
+        <div id="codes-empty" style="text-align:center;padding:24px;color:var(--text-muted);display:none">Chưa có code nào.</div>
+      </div>
+    </div>
+
+    <!-- THÊM CODE -->
+    <div class="page" id="page-addcode">
+      <div class="page-title">➕ Thêm Code</div>
+      <div class="card">
+        <div class="form-group">
+          <label>Chọn danh mục</label>
+          <select id="add-cat-select">
+            <option value="">-- Chọn danh mục --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Danh sách code (mỗi dòng 1 code)</label>
+          <textarea id="add-codes-textarea" placeholder="CODE001&#10;CODE002&#10;CODE003"></textarea>
+        </div>
+        <button class="btn btn-amber" onclick="submitAddCodes()">✅ NẠP CODE VÀO KHO</button>
+        <div id="add-result" style="margin-top:12px;font-size:13px;display:none"></div>
+      </div>
+    </div>
+
+    <!-- DANH MỤC -->
+    <div class="page" id="page-categories">
+      <div class="page-title">📂 Danh mục</div>
+      <div class="card">
+        <div class="card-title">Thêm danh mục mới</div>
+        <div class="form-row">
+          <div class="form-group"><label>Tên danh mục</label><input id="new-cat-name" placeholder="VD: GK88" /></div>
+          <div class="form-group"><label>Icon</label><input id="new-cat-icon" placeholder="🎰" value="🎁" /></div>
+        </div>
+        <div class="form-group"><label>Mô tả</label><input id="new-cat-desc" placeholder="Mô tả danh mục..." /></div>
+        <button class="btn btn-amber btn-sm" onclick="addCategory()">➕ Thêm danh mục</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Danh sách danh mục</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Icon</th><th>Tên</th><th>Slug</th><th>Còn lại / Tổng</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody id="categories-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- CÀI ĐẶT -->
+    <div class="page" id="page-settings">
+      <div class="page-title">⚙️ Cài đặt hệ thống</div>
+      <div class="card">
+        <div class="card-title">Link & Nhóm bắt buộc</div>
+        <div class="form-group">
+          <label>🔗 Link Tham Gia Tất Cả Nhóm</label>
+          <input id="set-join-link" placeholder="https://t.me/your_invite_link" />
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Link này sẽ hiển thị nút "THAM GIA TẤT CẢ NHÓM" trong MiniApp</div>
+        </div>
+        <div class="form-group">
+          <label>👥 Danh sách nhóm bắt buộc (mỗi dòng 1 @username)</label>
+          <textarea id="set-req-groups" style="min-height:80px" placeholder="@group1&#10;@group2"></textarea>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Bot phải là admin trong các nhóm này để check membership</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cài đặt chung</div>
+        <div class="form-row">
+          <div class="form-group"><label>Thời lượng xem video (giây)</label><input type="number" id="set-ad-dur" value="15" /></div>
+          <div class="form-group"><label>Mời bao nhiêu người → 1 code thưởng</label><input type="number" id="set-ref-count" value="3" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Bạn bè cần xem tối thiểu N video</label><input type="number" id="set-ref-vids" value="3" /></div>
+          <div class="form-group"><label>Tối đa N lượt xem từ 1 IP</label><input type="number" id="set-max-ip" value="5" /></div>
+        </div>
+        <div class="form-group"><label>Quy định & Thể lệ (hiển thị trong MiniApp)</label><textarea id="set-rules" style="min-height:100px"></textarea></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Mật khẩu Admin</div>
+        <div class="form-row">
+          <div class="form-group"><label>Mật khẩu mới</label><input type="password" id="set-new-pw" placeholder="Để trống = không đổi" /></div>
+        </div>
+      </div>
+      <button class="btn btn-amber" onclick="saveSettings()">💾 LƯU CÀI ĐẶT</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let adminToken = '';
+
+  // ── AUTH ──────────────────────────────────────────────────────────────────────
+  async function doLogin() {
+    const pw = document.getElementById('login-pw').value;
+    const resp = await fetch('/api/admin/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      adminToken = data.token;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      initApp();
+    } else {
+      document.getElementById('login-error').style.display = 'block';
+    }
+  }
+
+  function doLogout() {
+    adminToken = '';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-pw').value = '';
+  }
+
+  // ── NAVIGATION ────────────────────────────────────────────────────────────────
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+    if (name === 'dashboard') loadDashboard();
+    if (name === 'codes') loadCodes();
+    if (name === 'categories') loadCategories();
+    if (name === 'addcode') loadCategorySelects();
+    if (name === 'settings') loadSettings();
+  }
+
+  function api(url, opts = {}) {
+    return fetch(url, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, ...(opts.headers || {}) }
+    }).then(r => r.json());
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────────────────────
+  async function initApp() {
+    await loadDashboard();
+    await loadCategorySelects();
+  }
+
+  // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+  async function loadDashboard() {
+    const data = await api('/api/admin/stats');
+    if (!data.success) return;
+
+    const total = data.categories.reduce((s, c) => s + c.total, 0);
+    const avail = data.categories.reduce((s, c) => s + c.available, 0);
+    document.getElementById('stat-total-codes').textContent = total;
+    document.getElementById('stat-avail-codes').textContent = avail;
+    document.getElementById('stat-total-claims').textContent = data.totalClaims;
+    document.getElementById('stat-today-claims').textContent = data.todayClaims;
+    document.getElementById('stat-referrals').textContent = data.completedReferrals;
+
+    const tbody = document.getElementById('cat-stats-tbody');
+    tbody.innerHTML = data.categories.map(c => `
+      <tr>
+        <td><b>${c.name}</b></td>
+        <td>${c.total}</td>
+        <td><span class="badge badge-green">${c.available}</span></td>
+        <td><span class="badge badge-red">${c.used}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  // ── LOAD CODES ────────────────────────────────────────────────────────────────
+  async function loadCodes() {
+    const catId = document.getElementById('code-filter-cat').value;
+    const url = catId ? `/api/admin/codes?categoryId=${catId}` : '/api/admin/codes';
+    const data = await api(url);
+    const tbody = document.getElementById('codes-tbody');
+    const empty = document.getElementById('codes-empty');
+    if (!data.codes || data.codes.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    tbody.innerHTML = data.codes.map(c => `
+      <tr>
+        <td><code>${c.code}</code></td>
+        <td>${c.category_id}</td>
+        <td>${c.is_used ? '<span class="badge badge-red">Đã dùng</span>' : '<span class="badge badge-green">Còn lại</span>'}</td>
+        <td style="color:var(--text-muted);font-size:12px">${c.created_at ? c.created_at.slice(0,10) : '—'}</td>
+        <td><button class="btn btn-red btn-sm" onclick="deleteCode('${c.id}')">🗑️ Xóa</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function deleteCode(id) {
+    if (!confirm('Xóa code này?')) return;
+    const data = await api(`/api/admin/codes/${id}`, { method: 'DELETE' });
+    if (data.success) { showToast('✅ Đã xóa code!', 'success'); loadCodes(); }
+    else showToast('❌ Lỗi xóa code!', 'error');
+  }
+
+  // ── ADD CODES ─────────────────────────────────────────────────────────────────
+  async function loadCategorySelects() {
+    const data = await api('/api/admin/categories');
+    if (!data.success) return;
+
+    const select1 = document.getElementById('add-cat-select');
+    const select2 = document.getElementById('code-filter-cat');
+    const opts = data.categories.map(c => `<option value="${c.id}">${c.icon || '🎁'} ${c.name} (${c.available} còn lại)</option>`).join('');
+    select1.innerHTML = '<option value="">-- Chọn danh mục --</option>' + opts;
+    select2.innerHTML = '<option value="">-- Tất cả --</option>' + data.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+
+  async function submitAddCodes() {
+    const catId = document.getElementById('add-cat-select').value;
+    const codes = document.getElementById('add-codes-textarea').value.trim();
+    if (!catId) { showToast('⚠️ Chọn danh mục!', 'error'); return; }
+    if (!codes) { showToast('⚠️ Nhập code!', 'error'); return; }
+
+    const data = await api('/api/admin/codes', {
+      method: 'POST',
+      body: JSON.stringify({ categoryId: catId, codes })
+    });
+
+    const el = document.getElementById('add-result');
+    if (data.success) {
+      el.style.display = 'block';
+      el.style.color = 'var(--green)';
+      el.textContent = `✅ Đã nạp thành công ${data.added} code!`;
+      document.getElementById('add-codes-textarea').value = '';
+      showToast(`✅ Nạp ${data.added} code thành công!`, 'success');
+      loadCategorySelects();
+    } else {
+      el.style.display = 'block';
+      el.style.color = 'var(--red)';
+      el.textContent = '❌ Lỗi: ' + (data.error || 'Không xác định');
+    }
+  }
+
+  // ── CATEGORIES ────────────────────────────────────────────────────────────────
+  async function loadCategories() {
+    const data = await api('/api/admin/categories');
+    if (!data.success) return;
+    const tbody = document.getElementById('categories-tbody');
+    tbody.innerHTML = data.categories.map(c => `
+      <tr>
+        <td style="font-size:20px">${c.icon || '🎁'}</td>
+        <td><b>${c.name}</b></td>
+        <td><code>${c.slug}</code></td>
+        <td>${c.available} / ${c.total}</td>
+        <td>${c.active ? '<span class="badge badge-green">Hoạt động</span>' : '<span class="badge badge-red">Ẩn</span>'}</td>
+        <td><button class="btn btn-red btn-sm" onclick="deleteCategory('${c.id}')">🗑️</button></td>
+      </tr>
+    `).join('');
+  }
+
+  async function addCategory() {
+    const name = document.getElementById('new-cat-name').value.trim();
+    const icon = document.getElementById('new-cat-icon').value.trim() || '🎁';
+    const desc = document.getElementById('new-cat-desc').value.trim();
+    if (!name) { showToast('⚠️ Nhập tên danh mục!', 'error'); return; }
+    const data = await api('/api/admin/categories', { method: 'POST', body: JSON.stringify({ name, icon, description: desc }) });
+    if (data.success) { showToast('✅ Thêm danh mục thành công!', 'success'); loadCategories(); loadCategorySelects(); }
+    else showToast('❌ Lỗi: ' + data.error, 'error');
+  }
+
+  async function deleteCategory(id) {
+    if (!confirm('Xóa danh mục và toàn bộ code trong đó?')) return;
+    const data = await api(`/api/admin/categories/${id}`, { method: 'DELETE' });
+    if (data.success) { showToast('✅ Đã xóa!', 'success'); loadCategories(); }
+    else showToast('❌ Lỗi!', 'error');
+  }
+
+  // ── SETTINGS ──────────────────────────────────────────────────────────────────
+  async function loadSettings() {
+    const data = await api('/api/admin/settings');
+    if (!data.success) return;
+    const s = data.settings;
+    document.getElementById('set-join-link').value = s.joinAllLink || '';
+    document.getElementById('set-req-groups').value = (s.requiredGroups || []).join('\n');
+    document.getElementById('set-ad-dur').value = s.adDurationSeconds || 15;
+    document.getElementById('set-ref-count').value = s.referralRewardCount || 3;
+    document.getElementById('set-ref-vids').value = s.referralMinVideos || 3;
+    document.getElementById('set-max-ip').value = s.maxIpViews || 5;
+    document.getElementById('set-rules').value = s.rulesText || '';
+  }
+
+  async function saveSettings() {
+    const joinAllLink = document.getElementById('set-join-link').value.trim();
+    const reqGroupsRaw = document.getElementById('set-req-groups').value.trim();
+    const requiredGroups = reqGroupsRaw ? reqGroupsRaw.split('\n').map(g => g.trim()).filter(g => g) : [];
+    const adDurationSeconds = parseInt(document.getElementById('set-ad-dur').value) || 15;
+    const referralRewardCount = parseInt(document.getElementById('set-ref-count').value) || 3;
+    const referralMinVideos = parseInt(document.getElementById('set-ref-vids').value) || 3;
+    const maxIpViews = parseInt(document.getElementById('set-max-ip').value) || 5;
+    const rulesText = document.getElementById('set-rules').value;
+    const newPw = document.getElementById('set-new-pw').value.trim();
+
+    const payload = { joinAllLink, requiredGroups, adDurationSeconds, referralRewardCount, referralMinVideos, maxIpViews, rulesText };
+    if (newPw) payload.adminPassword = newPw;
+
+    const data = await api('/api/admin/settings', { method: 'POST', body: JSON.stringify(payload) });
+    if (data.success) showToast('✅ Đã lưu cài đặt!', 'success');
+    else showToast('❌ Lỗi lưu cài đặt!', 'error');
+  }
+
+  // ── TOAST ─────────────────────────────────────────────────────────────────────
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show ' + type;
+    setTimeout(() => { t.className = ''; }, 3000);
+  }
+</script>
+</body>
+</html>

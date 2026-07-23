@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Video, History, Sparkles, Trophy, User, FileText, Crown, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Gift, Video, History, Sparkles, Trophy, User, FileText, Crown, Clock, CheckCircle2, AlertTriangle, Users, Copy, Check } from 'lucide-react';
 import AdPlayerModal from './components/AdPlayerModal';
 import ClaimSuccessModal from './components/ClaimSuccessModal';
 import HistoryTab from './components/HistoryTab';
+import MembershipGate from './components/MembershipGate';
 import { soundFx } from './utils/sound';
 import { playRewardedAd } from './utils/adProvider';
 import { initTelegramApp, triggerHaptic, setTelegramBackButton, getTelegramUser, isTelegramMiniApp } from './utils/telegram';
 import TelegramOnlyGuard from './components/TelegramOnlyGuard';
+import { getBrowserFingerprint } from './utils/fingerprint';
 
 export default function App() {
   // Active page: 'code' (Trang Nhận Code) | 'history' (Trang Lịch Sử)
@@ -24,6 +26,16 @@ export default function App() {
 
   // 15s Inter-Ad Rest Cooldown (between each video)
   const [interAdCooldown, setInterAdCooldown] = useState(0);
+
+  // Membership Gate State
+  const [membershipAllowed, setMembershipAllowed] = useState(true);
+  const [missingGroups, setMissingGroups] = useState([]);
+  const [joinAllLink, setJoinAllLink] = useState('');
+  const [isCheckingMembership, setIsCheckingMembership] = useState(false);
+
+  // Referral Stats
+  const [refStats, setRefStats] = useState({ total: 0, completed: 0, pending: 0, rewardsEarned: 0, rewardCount: 3 });
+  const [copiedRefLink, setCopiedRefLink] = useState(false);
 
   // Modals
   const [showAdModal, setShowAdModal] = useState(false);
@@ -52,6 +64,17 @@ export default function App() {
     fetchRecentClaims();
   }, []);
 
+  const userId = tgUser ? String(tgUser.id) : 'user-web';
+
+  useEffect(() => {
+    // Fetch 24h cooldown status, membership check & referral stats
+    if (userId) {
+      fetchUserCooldown();
+      checkMembership();
+      fetchReferralStats();
+    }
+  }, [tgUser]);
+
   // Sync Telegram Native BackButton when activeNav changes
   useEffect(() => {
     if (activeNav === 'history') {
@@ -62,13 +85,6 @@ export default function App() {
       setTelegramBackButton(null);
     }
   }, [activeNav]);
-
-  const userId = tgUser ? String(tgUser.id) : 'user-web';
-
-  useEffect(() => {
-    // Fetch 24h cooldown status for user
-    fetchUserCooldown();
-  }, [tgUser]);
 
   // Ticking countdown timer for 24h cooldown
   useEffect(() => {
@@ -92,6 +108,35 @@ export default function App() {
     return () => clearInterval(timer);
   }, [interAdCooldown]);
 
+  const checkMembership = async () => {
+    setIsCheckingMembership(true);
+    try {
+      const res = await fetch(`/api/user/membership?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data.success) {
+        setMembershipAllowed(data.allowed);
+        setMissingGroups(data.missingGroups || []);
+        if (data.joinAllLink) setJoinAllLink(data.joinAllLink);
+      }
+    } catch (err) {
+      console.error('Error checking membership:', err);
+    } finally {
+      setIsCheckingMembership(false);
+    }
+  };
+
+  const fetchReferralStats = async () => {
+    try {
+      const res = await fetch(`/api/user/referral?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      if (data.success) {
+        setRefStats(data);
+      }
+    } catch (err) {
+      console.error('Error fetching referral stats:', err);
+    }
+  };
+
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/categories');
@@ -111,6 +156,7 @@ export default function App() {
       if (data.success && data.settings) {
         if (data.settings.adDurationSeconds) setAdDuration(data.settings.adDurationSeconds);
         if (data.settings.rulesText) setRulesText(data.settings.rulesText);
+        if (data.settings.joinAllLink) setJoinAllLink(data.settings.joinAllLink);
       }
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -170,6 +216,26 @@ export default function App() {
     }
 
     setIsAdLoading(true);
+
+    // 0. IP & Fingerprint Security Check
+    try {
+      const fp = getBrowserFingerprint();
+      const viewRes = await fetch('/api/ads/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, step: videoStep, fingerprint: fp })
+      });
+      const viewData = await viewRes.json();
+      if (viewData.blocked) {
+        setIsAdLoading(false);
+        triggerHaptic('warning');
+        alert(viewData.message || 'Phát hiện sử dụng nhiều tài khoản trên 1 thiết bị/IP!');
+        return;
+      }
+    } catch (e) {
+      console.warn('IP/Fingerprint check note:', e);
+    }
+
     // 1. Try real ad SDK (Adsgram / Monetag)
     const adResult = await playRewardedAd(videoStep);
     setIsAdLoading(false);
@@ -239,6 +305,15 @@ export default function App() {
     setActiveNav(tab);
   };
 
+  const handleCopyRefLink = () => {
+    soundFx.playTap();
+    triggerHaptic('light');
+    const refLink = `https://t.me/Gg88gk88_bot?start=ref_${userId}`;
+    navigator.clipboard.writeText(refLink);
+    setCopiedRefLink(true);
+    setTimeout(() => setCopiedRefLink(false), 2500);
+  };
+
   // Format milliseconds into HH:MM:SS
   const formatHHMMSS = (ms) => {
     const totalSeconds = Math.ceil(ms / 1000);
@@ -258,6 +333,18 @@ export default function App() {
     return <TelegramOnlyGuard />;
   }
 
+  // Enforce Mandatory Group Membership Gate
+  if (!membershipAllowed) {
+    return (
+      <MembershipGate
+        missingGroups={missingGroups}
+        joinAllLink={joinAllLink}
+        onRecheck={checkMembership}
+        isChecking={isCheckingMembership}
+      />
+    );
+  }
+
   return (
     <>
       {/* Top Announcement Marquee Bar */}
@@ -269,7 +356,7 @@ export default function App() {
                 <span className="highlight">
                   {claim.username?.startsWith('@') ? claim.username : (claim.username?.includes(' ') ? claim.username : `@${claim.username}`)}
                 </span>{' '}
-                vừa xem 5/5 video nhận Gifcode {claim.categoryName || 'Tân Thủ'}
+                vừa nhận Gifcode thành công 🎁
               </span>
             ))
           ) : (
@@ -278,7 +365,7 @@ export default function App() {
                 📢 Chào mừng bạn đến với <span className="highlight">Hệ Thống Nhận Gifcode Tân Thủ</span>
               </span>
               <span className="announcement-item">
-                🎬 Xem đủ <span className="highlight">5/5 video (3 Adsgram + 2 Monetag)</span> để nhận ngay 1 Gifcode
+                🎬 Xem đủ <span className="highlight">5/5 video</span> để nhận ngay 1 Gifcode
               </span>
               <span className="announcement-item">
                 ⏳ Giới hạn: <span className="highlight">1 lượt nhận / 24h</span> mỗi tài khoản Telegram
@@ -286,7 +373,7 @@ export default function App() {
             </>
           )}
           <span className="announcement-item">
-            Quy định: Xem đủ 5 Video (3 Adsgram + 2 Monetag) để nhận 1 Code (1 Ngày nhận 1 lần)
+            Quy định: Xem đủ 5 Video quảng cáo để nhận 1 Code (1 Ngày nhận 1 lần)
           </span>
         </div>
       </div>
@@ -332,7 +419,7 @@ export default function App() {
             <h2 className="hero-display-title">NHẬN GIFCODE TRẢI NGHIỆM</h2>
             
             <p className="hero-description-text">
-              Xem đủ 5 video quảng cáo (3 Adsgram + 2 Monetag) để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
+              Xem đủ 5 video quảng cáo để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
             </p>
 
             {/* 5-Video Step Progress Tracker */}
@@ -407,6 +494,41 @@ export default function App() {
                   ? `Nghỉ ${interAdCooldown}s trước video ${videoStep}/5`
                   : `Đang ở lượt xem ${videoStep}/5`}
               </span>
+            </div>
+          </div>
+
+          {/* Referral Card */}
+          <div className="crafted-card">
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--accent-amber-light)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <Users size={16} />
+              <span>MỜI BẠN BÈ - NHẬN THÊM GIFCODE</span>
+            </div>
+
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '12px' }}>
+              Mời <b>3 người bạn</b> tham gia & xem đủ video → Nhận ngay 1 Gifcode thưởng (không tốn lượt 24h)!
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ flex: 1, background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '8px 12px', fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                https://t.me/Gg88gk88_bot?start=ref_{userId}
+              </div>
+              <button
+                onClick={handleCopyRefLink}
+                className="btn-primary-crafted"
+                style={{ padding: '8px 14px', fontSize: '12px', whiteSpace: 'nowrap' }}
+              >
+                {copiedRefLink ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedRefLink ? 'Đã chép' : 'Sao chép'}</span>
+              </button>
+            </div>
+
+            {/* Progress bar for referrals */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
+              <span>Đã hoàn thành: <b>{refStats.completed}</b> / {refStats.rewardCount} người</span>
+              <span>Đã thưởng: <b>{refStats.rewardsEarned}</b> code</span>
+            </div>
+            <div className="progress-track" style={{ height: '6px' }}>
+              <div className="progress-fill-bar" style={{ width: `${Math.min(100, (refStats.completed % refStats.rewardCount) / refStats.rewardCount * 100)}%` }} />
             </div>
           </div>
 

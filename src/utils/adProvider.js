@@ -1,25 +1,22 @@
 /**
  * Ad Provider Utility for Adsgram & Monetag Rewarded Ads (5-Video Sequence)
- * Step 1: Adsgram int-39406
- * Step 2: Adsgram int-39407
- * Step 3: Adsgram int-39406
- * Step 4: Monetag In-App Interstitial #1 (show_11375549 - inApp)
- * Step 5: Monetag In-App Interstitial #2 (show_11375549 - inApp)
- *
- * NOTE: 'pop' format is popunder/directlink and opens a new browser tab.
- * It does NOT work inside Telegram Mini App. Always use inApp format.
+ * Step 1: Adsgram blockId "39426"
+ * Step 2: Adsgram blockId "39427"
+ * Step 3: Adsgram blockId "39426"
+ * Step 4: Monetag In-App Interstitial #1
+ * Step 5: Monetag In-App Interstitial #2
  */
 
-export const ADSGRAM_BLOCKS = ['int-39406', 'int-39407'];
+export const ADSGRAM_BLOCKS = ['39426', '39427'];
 
 export async function playRewardedAd(stepIndex = 1) {
-  // Steps 1, 2, 3: Adsgram Network (using int-39406 & int-39407)
+  // Steps 1, 2, 3: Adsgram Network (numeric blockId — no int- prefix)
   if (stepIndex >= 1 && stepIndex <= 3) {
-    const blockId = (stepIndex === 2) ? 'int-39407' : 'int-39406';
+    const blockId = (stepIndex === 2) ? '39427' : '39426';
 
     if (typeof window !== 'undefined' && window.Adsgram) {
       try {
-        console.log(`🎬 [Adsgram] Launching Block ID "${blockId}" for Step ${stepIndex}/5...`);
+        console.log(`🎬 [Adsgram] Launching blockId "${blockId}" for Step ${stepIndex}/5...`);
         
         const AdController = window.Adsgram.init({ blockId, debug: false });
         const result = await AdController.show();
@@ -34,14 +31,12 @@ export async function playRewardedAd(stepIndex = 1) {
     }
   }
 
-  // Steps 4, 5: Monetag Network — using inApp interstitial (NOT 'pop' directlink)
+  // Steps 4, 5: Monetag Network — inApp interstitial (NOT pop/directlink)
   if (stepIndex >= 4 && stepIndex <= 5) {
     if (typeof window !== 'undefined' && typeof window.show_11375549 === 'function') {
       try {
         console.log(`🎬 [Monetag] Launching inApp interstitial for Step ${stepIndex}/5...`);
 
-        // Always use inApp format — works inside Telegram Mini App
-        // 'pop' format opens a new browser tab (directlink) — NOT suitable for Telegram
         await window.show_11375549({
           type: 'inApp',
           inAppSettings: {
