@@ -11,6 +11,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 80;
 
+// Enable trust proxy for Cloudflare CDN / Reverse Proxy
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json());
 
@@ -37,7 +40,9 @@ app.use((req, res, next) => {
     });
   }
 
+  // Cloudflare & Telegram WebApp embedding compatible headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://t.me https://*.t.me;");
   res.setHeader('X-Frame-Options', 'ALLOW-FROM https://web.telegram.org');
 
   next();
@@ -130,7 +135,7 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ [FULL PORT 80] Backend API, Telegram Bot & Web App đang chạy duy nhất tại cổng http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ [FULL PORT 80] Server đang lắng nghe trên 0.0.0.0:${PORT} (Chấp nhận tất cả kết nối từ Cloudflare Proxy!)`);
   setupTelegramBot();
 });

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, AlertCircle, X, Volume2, CheckCircle2 } from 'lucide-react';
 import { soundFx } from '../utils/sound';
 
-export default function AdPlayerModal({ category, targetDuration = 15, currentStep = 1, totalSteps = 3, onAdComplete, onClose }) {
+export default function AdPlayerModal({ category, targetDuration = 15, currentStep = 1, totalSteps = 5, onAdComplete, onClose }) {
   const [timeLeft, setTimeLeft] = useState(targetDuration);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -30,6 +30,10 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
     await onAdComplete();
     setIsClaiming(false);
   };
+
+  const providerLabel = currentStep <= 3 
+    ? `Adsgram Ad #${currentStep} (${currentStep === 2 ? 'int-39407' : 'int-39406'})` 
+    : `Monetag Ad #${currentStep} (${currentStep === 4 ? 'Rewarded Pop' : 'In-App Interstitial'})`;
 
   return (
     <div className="crafted-modal-backdrop">
@@ -74,7 +78,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
           {/* Backdrop Viewport */}
           <div className="video-backdrop-art">
             <span style={{ background: 'var(--accent-amber-bg)', border: '1px solid var(--border-amber)', color: 'var(--accent-amber-light)', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-              VIDEO {currentStep} TRÊN TỔNG SỐ {totalSteps} VIDEO
+              {providerLabel}
             </span>
             <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
               NHẬN GIFCODE TRẢI NGHIỆM
@@ -82,7 +86,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '85%', margin: '0 auto', lineHeight: '1.5' }}>
               {currentStep < totalSteps 
                 ? `Xem xong video này để tiến tới Video ${currentStep + 1}/${totalSteps}!`
-                : `Lượt xem cuối cùng! Sau video này bạn sẽ nhận ngay 1 Gifcode độc quyền!`
+                : `Video cuối cùng (${currentStep}/${totalSteps})! Sau video này bạn sẽ nhận ngay 1 Gifcode độc quyền!`
               }
             </p>
           </div>
@@ -118,7 +122,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
                     ? 'ĐANG XÁC NHẬN...' 
                     : currentStep < totalSteps 
                       ? `XÁC NHẬN HOÀN THÀNH VIDEO ${currentStep}/${totalSteps}` 
-                      : 'HOÀN THÀNH VIDEO 3/3 - BỐC CODE NGAY!'
+                      : `HOÀN THÀNH VIDEO ${totalSteps}/${totalSteps} - BỐC CODE NGAY!`
                   }
                 </span>
               </button>

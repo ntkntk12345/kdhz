@@ -166,14 +166,14 @@ export default function App() {
 
   // Callback when user completes video ad in modal
   const handleAdStepComplete = async () => {
-    if (videoStep < 3) {
-      // Completed Video 1/3 or 2/3
+    if (videoStep < 5) {
+      // Completed Video 1/5, 2/5, 3/5, 4/5
       setShowAdModal(false);
       soundFx.playTap();
       triggerHaptic('light');
       setVideoStep(prev => prev + 1);
     } else {
-      // Completed Video 3/3 (Final step to claim code)
+      // Completed Video 5/5 (Final step to claim code)
       try {
         const username = tgUser ? (tgUser.first_name || tgUser.username) : 'Khách May Mắn';
 
@@ -249,7 +249,7 @@ export default function App() {
                 <span className="highlight">
                   {claim.username?.startsWith('@') ? claim.username : (claim.username?.includes(' ') ? claim.username : `@${claim.username}`)}
                 </span>{' '}
-                vừa xem 3/3 video nhận Gifcode {claim.categoryName || 'Tân Thủ'}
+                vừa xem 5/5 video nhận Gifcode {claim.categoryName || 'Tân Thủ'}
               </span>
             ))
           ) : (
@@ -258,7 +258,7 @@ export default function App() {
                 📢 Chào mừng bạn đến với <span className="highlight">Hệ Thống Nhận Gifcode Tân Thủ</span>
               </span>
               <span className="announcement-item">
-                🎬 Xem đủ <span className="highlight">3/3 video quảng cáo</span> để nhận ngay 1 Gifcode trải nghiệm
+                🎬 Xem đủ <span className="highlight">5/5 video (3 Adsgram + 2 Monetag)</span> để nhận ngay 1 Gifcode
               </span>
               <span className="announcement-item">
                 ⏳ Giới hạn: <span className="highlight">1 lượt nhận / 24h</span> mỗi tài khoản Telegram
@@ -266,7 +266,7 @@ export default function App() {
             </>
           )}
           <span className="announcement-item">
-            Quy định: Xem đủ 3 Video để nhận 1 Code (1 Ngày nhận 1 lần)
+            Quy định: Xem đủ 5 Video (3 Adsgram + 2 Monetag) để nhận 1 Code (1 Ngày nhận 1 lần)
           </span>
         </div>
       </div>
@@ -312,20 +312,22 @@ export default function App() {
             <h2 className="hero-display-title">NHẬN GIFCODE TRẢI NGHIỆM</h2>
             
             <p className="hero-description-text">
-              Xem đủ 3 video quảng cáo ({adDuration}s mỗi video) để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
+              Xem đủ 5 video quảng cáo (3 Adsgram + 2 Monetag) để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
             </p>
 
-            {/* 3-Video Step Progress Tracker */}
+            {/* 5-Video Step Progress Tracker */}
             {cooldownMs <= 0 && (
               <div className="video-step-progress-wrapper">
                 <div className="step-tracker-header">
                   <span>TIẾN TRÌNH XEM VIDEO</span>
-                  <span>BƯỚC {videoStep}/3</span>
+                  <span>BƯỚC {videoStep}/5</span>
                 </div>
                 <div className="step-dots-row">
                   <div className={`step-dot-item ${videoStep > 1 ? 'completed' : videoStep === 1 ? 'active' : ''}`} />
                   <div className={`step-dot-item ${videoStep > 2 ? 'completed' : videoStep === 2 ? 'active' : ''}`} />
-                  <div className={`step-dot-item ${videoStep === 3 ? 'active' : ''}`} />
+                  <div className={`step-dot-item ${videoStep > 3 ? 'completed' : videoStep === 3 ? 'active' : ''}`} />
+                  <div className={`step-dot-item ${videoStep > 4 ? 'completed' : videoStep === 4 ? 'active' : ''}`} />
+                  <div className={`step-dot-item ${videoStep === 5 ? 'active' : ''}`} />
                 </div>
               </div>
             )}
@@ -353,9 +355,11 @@ export default function App() {
                 >
                   <Video size={22} color="#000" />
                   <span>
-                    {videoStep === 1 && 'XEM VIDEO (1/3)'}
-                    {videoStep === 2 && 'XEM VIDEO (2/3)'}
-                    {videoStep === 3 && 'XEM VIDEO (3/3 - BỐC CODE)'}
+                    {videoStep === 1 && 'XEM VIDEO 1/5 (Adsgram)'}
+                    {videoStep === 2 && 'XEM VIDEO 2/5 (Adsgram)'}
+                    {videoStep === 3 && 'XEM VIDEO 3/5 (Adsgram)'}
+                    {videoStep === 4 && 'XEM VIDEO 4/5 (Monetag Pop)'}
+                    {videoStep === 5 && 'XEM VIDEO 5/5 (Monetag - BỐC CODE)'}
                   </span>
                 </button>
               </div>
@@ -365,7 +369,7 @@ export default function App() {
             <div style={{ marginTop: '18px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
               <span className="live-pulse-dot" />
               <span>
-                {cooldownMs > 0 ? 'Đang trong thời gian chờ 24h' : `Đang ở lượt xem ${videoStep}/3`}
+                {cooldownMs > 0 ? 'Đang trong thời gian chờ 24h' : `Đang ở lượt xem ${videoStep}/5`}
               </span>
             </div>
           </div>
@@ -378,7 +382,7 @@ export default function App() {
                 <span>QUY ĐỊNH & THỂ LỆ NHẬN CODE</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
-                {`1. Cần xem đủ 3 video quảng cáo để nhận 1 Gifcode.\n2. Mỗi tài khoản chỉ được nhận 1 Gifcode trong vòng 24 giờ.\n3. Thời gian đếm ngược 24h bắt đầu ngay sau khi nhận code thành công.\n\n${rulesText}`}
+                {`1. Cần xem đủ 5 video (3 Adsgram + 2 Monetag) để nhận 1 Gifcode.\n2. Mỗi tài khoản chỉ được nhận 1 Gifcode trong vòng 24 giờ.\n3. Thời gian đếm ngược 24h bắt đầu ngay sau khi nhận code thành công.\n\n${rulesText}`}
               </div>
             </div>
           )}
@@ -410,7 +414,7 @@ export default function App() {
                           {formattedUser}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                          Đã xem đủ 3/3 video & nhận quà
+                          Đã xem đủ 5/5 video & nhận quà
                         </div>
                       </div>
                     </div>
@@ -458,7 +462,7 @@ export default function App() {
           category={currentCategory}
           targetDuration={adDuration}
           currentStep={videoStep}
-          totalSteps={3}
+          totalSteps={5}
           onAdComplete={handleAdStepComplete}
           onClose={() => setShowAdModal(false)}
         />
