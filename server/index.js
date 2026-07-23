@@ -191,7 +191,7 @@ app.get('/api/user/membership', async (req, res) => {
         const resp = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${encodeURIComponent(group)}&user_id=${userId}`);
         const data = await resp.json();
         const status = data?.result?.status;
-        if (!status || ['left', 'kicked', 'banned'].includes(status)) {
+        if (!status || !['member', 'administrator', 'creator'].includes(status)) {
           missingGroups.push(group);
         }
       } catch {
