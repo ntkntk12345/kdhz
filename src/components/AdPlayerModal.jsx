@@ -78,7 +78,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
           {/* Backdrop Viewport */}
           <div className="video-backdrop-art">
             <span style={{ background: 'var(--accent-amber-bg)', border: '1px solid var(--border-amber)', color: 'var(--accent-amber-light)', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-              {providerLabel}
+              VIDEO {currentStep}/{totalSteps}
             </span>
             <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em' }}>
               NHẬN GIFCODE TRẢI NGHIỆM

@@ -15,12 +15,15 @@ export default function App() {
   
   const [categories, setCategories] = useState([]);
   
-  // 3-Video Step Progress (1, 2, or 3)
+  // 5-Video Step Progress (1..5)
   const [videoStep, setVideoStep] = useState(1);
   const [isAdLoading, setIsAdLoading] = useState(false);
   
   // 24-Hour Cooldown State
   const [cooldownMs, setCooldownMs] = useState(0);
+
+  // 15s Inter-Ad Rest Cooldown (between each video)
+  const [interAdCooldown, setInterAdCooldown] = useState(0);
 
   // Modals
   const [showAdModal, setShowAdModal] = useState(false);
@@ -77,6 +80,17 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, [cooldownMs]);
+
+  // Ticking countdown timer for 15s inter-ad cooldown
+  useEffect(() => {
+    if (interAdCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setInterAdCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [interAdCooldown]);
 
   const fetchCategories = async () => {
     try {
@@ -143,6 +157,11 @@ export default function App() {
       alert('Tài khoản của bạn đang trong thời gian chờ 24h! Vui lòng quay lại sau.');
       return;
     }
+    if (interAdCooldown > 0) {
+      triggerHaptic('warning');
+      alert(`Vui lòng nghỉ ${interAdCooldown}s trước khi xem video tiếp theo!`);
+      return;
+    }
     if (!currentCategory) return;
     if (currentCategory.availableCodes <= 0) {
       triggerHaptic('warning');
@@ -167,10 +186,11 @@ export default function App() {
   // Callback when user completes video ad in modal
   const handleAdStepComplete = async () => {
     if (videoStep < 5) {
-      // Completed Video 1/5, 2/5, 3/5, 4/5
+      // Completed Video 1/5, 2/5, 3/5, 4/5 → start 15s inter-ad rest
       setShowAdModal(false);
       soundFx.playTap();
       triggerHaptic('light');
+      setInterAdCooldown(15); // 15s rest before next video
       setVideoStep(prev => prev + 1);
     } else {
       // Completed Video 5/5 (Final step to claim code)
@@ -346,20 +366,32 @@ export default function App() {
                   {formatHHMMSS(cooldownMs)}
                 </div>
               </div>
+            ) : interAdCooldown > 0 ? (
+              /* 15s Inter-Ad Rest Cooldown UI */
+              <div className="cooldown-active-card" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                <div style={{ fontSize: '36px', marginBottom: '4px' }}>⏳</div>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent-amber-light)', marginBottom: '6px' }}>
+                  NGHỈ NGƠI TRƯỚC VIDEO {videoStep}/5
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', maxWidth: '85%', margin: '0 auto 10px' }}>
+                  Video {videoStep - 1}/5 xem xong! Chờ {interAdCooldown}s để xem tiếp video {videoStep}/5.
+                </p>
+                <div className="countdown-timer-display" style={{ fontSize: '28px' }}>
+                  {String(interAdCooldown).padStart(2, '0')}s
+                </div>
+              </div>
             ) : (
               <div className="watch-video-cta-container">
                 <div className="watch-video-pulse-ring" />
                 <button 
                   className="btn-hero-watch-video" 
                   onClick={handleStartWatchAd}
+                  disabled={isAdLoading}
                 >
                   <Video size={22} color="#000" />
                   <span>
-                    {videoStep === 1 && 'XEM VIDEO 1/5 (Adsgram)'}
-                    {videoStep === 2 && 'XEM VIDEO 2/5 (Adsgram)'}
-                    {videoStep === 3 && 'XEM VIDEO 3/5 (Adsgram)'}
-                    {videoStep === 4 && 'XEM VIDEO 4/5 (Monetag Pop)'}
-                    {videoStep === 5 && 'XEM VIDEO 5/5 (Monetag - BỐC CODE)'}
+                    {isAdLoading && 'Đang tải quảng cáo...'}
+                    {!isAdLoading && `XEM VIDEO ${videoStep}/5`}
                   </span>
                 </button>
               </div>
@@ -369,7 +401,11 @@ export default function App() {
             <div style={{ marginTop: '18px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
               <span className="live-pulse-dot" />
               <span>
-                {cooldownMs > 0 ? 'Đang trong thời gian chờ 24h' : `Đang ở lượt xem ${videoStep}/5`}
+                {cooldownMs > 0
+                  ? 'Đang trong thời gian chờ 24h'
+                  : interAdCooldown > 0
+                  ? `Nghỉ ${interAdCooldown}s trước video ${videoStep}/5`
+                  : `Đang ở lượt xem ${videoStep}/5`}
               </span>
             </div>
           </div>
@@ -382,7 +418,7 @@ export default function App() {
                 <span>QUY ĐỊNH & THỂ LỆ NHẬN CODE</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
-                {`1. Cần xem đủ 5 video (3 Adsgram + 2 Monetag) để nhận 1 Gifcode.\n2. Mỗi tài khoản chỉ được nhận 1 Gifcode trong vòng 24 giờ.\n3. Thời gian đếm ngược 24h bắt đầu ngay sau khi nhận code thành công.\n\n${rulesText}`}
+                {`1. Cần xem đủ 5 video quảng cáo để nhận 1 Gifcode.\n2. Mỗi tài khoản chỉ được nhận 1 Gifcode trong vòng 24 giờ.\n3. Thời gian đếm ngược 24h bắt đầu ngay sau khi nhận code thành công.\n\n${rulesText}`}
               </div>
             </div>
           )}
@@ -414,7 +450,7 @@ export default function App() {
                           {formattedUser}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                          Đã xem đủ 5/5 video & nhận quà
+                          Đã nhận Gifcode thành công 🎁
                         </div>
                       </div>
                     </div>
