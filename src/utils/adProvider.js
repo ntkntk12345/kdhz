@@ -1,25 +1,29 @@
 /**
  * Ad Provider Utility for Adsgram & Monetag Rewarded Ads (5-Video Sequence)
- * Step 1: Adsgram int-39406
- * Step 2: Adsgram int-39407
- * Step 3: Adsgram int-39406
+ * Step 1: Adsgram Block 36871
+ * Step 2: Adsgram Block 39407
+ * Step 3: Adsgram Block 36871
  * Step 4: Monetag Rewarded Pop (show_11375549('pop'))
  * Step 5: Monetag In-App Interstitial (show_11375549)
  */
 
-export const ADSGRAM_BLOCKS = ['int-39406', 'int-39407'];
+export const ADSGRAM_BLOCKS = ['36871', '39407', '39406'];
 
 export async function playRewardedAd(stepIndex = 1) {
   // Steps 1, 2, 3: Adsgram Network
   if (stepIndex >= 1 && stepIndex <= 3) {
     if (typeof window !== 'undefined' && window.Adsgram) {
       try {
-        const blockId = (stepIndex === 2) ? ADSGRAM_BLOCKS[1] : ADSGRAM_BLOCKS[0];
-        const AdController = window.Adsgram.init({ blockId });
+        // Select Adsgram blockId (36871 for step 1 & 3, 39407 for step 2)
+        const blockId = (stepIndex === 2) ? '39407' : '36871';
+        
+        // Initialize Adsgram controller with Block ID
+        const AdController = window.Adsgram.init({ blockId, debug: false });
         const result = await AdController.show();
+        
         return { success: true, provider: 'adsgram', blockId, stepIndex, details: result };
       } catch (err) {
-        console.warn(`Adsgram Step ${stepIndex} error:`, err);
+        console.warn(`Adsgram Step ${stepIndex} error or skipped:`, err);
       }
     }
   }
@@ -51,6 +55,6 @@ export async function playRewardedAd(stepIndex = 1) {
     }
   }
 
-  // Fallback to simulated ad modal if real SDK fails or is uninitialized
+  // Fallback to internal video player modal if real SDK is skipped or unavailable
   return { success: false, fallbackRequired: true };
 }

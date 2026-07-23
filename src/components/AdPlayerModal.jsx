@@ -32,7 +32,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
   };
 
   const providerLabel = currentStep <= 3 
-    ? `Adsgram Ad #${currentStep} (${currentStep === 2 ? 'int-39407' : 'int-39406'})` 
+    ? `Adsgram Ad #${currentStep} (Block ID: ${currentStep === 2 ? '39407' : '36871'})` 
     : `Monetag Ad #${currentStep} (${currentStep === 4 ? 'Rewarded Pop' : 'In-App Interstitial'})`;
 
   return (
