@@ -76,9 +76,10 @@ export function setupTelegramBot() {
         { text: '👥 Thống kê mời bạn' }
       ]);
 
-      // Row 4: Admin Panel (if Admin)
+      // Row 4: Admin Panel & Stock Stats (ONLY IF ADMIN)
       if (isAdmin) {
         keyboard.push([
+          { text: '📦 Thống kê kho code' },
           { text: '⚙️ BẢNG ĐIỀU KHIỂN ADMIN' }
         ]);
       }
@@ -317,6 +318,28 @@ export function setupTelegramBot() {
       const chatId = msg.chat.id;
       const senderId = String(msg.from?.id);
       const text = msg.text.trim();
+
+      // Bấm nút Reply Keyboard: "📦 Thống kê kho code" (CHỈ DÀNH CHO ADMIN)
+      if (text === '📦 Thống kê kho code') {
+        const isAdmin = db.isAdminTelegram(senderId) || String(senderId) === '5301275536';
+        if (!isAdmin) {
+          bot.sendMessage(chatId, '⛔ Chức năng Thống Kê Kho Code chỉ dành cho Admin!');
+          return;
+        }
+
+        try {
+          const stats = await db.getTotalCodeStats();
+          const replyText = `⚙️ <b>THỐNG KÊ KHO GIFCODE (QUẢN TRỊ VIÊN)</b>\n\n` +
+            `🟢 <b>Mã Code khả dụng trong kho:</b> <b>${stats.available}</b> / ${stats.total} code\n` +
+            `🎁 <b>Đã bốc thành công:</b> <b>${stats.used}</b> mã\n\n` +
+            `👇 <i>Sử dụng Bảng Quản Trị để nạp thêm code khi cần!</i>`;
+
+          bot.sendMessage(chatId, replyText, { parse_mode: 'HTML' });
+        } catch (err) {
+          bot.sendMessage(chatId, `❌ Lỗi lấy thống kê kho: ${err.message}`);
+        }
+        return;
+      }
 
       // Bấm nút Reply Keyboard: "📋 Code đã nhận"
       if (text === '📋 Code đã nhận') {

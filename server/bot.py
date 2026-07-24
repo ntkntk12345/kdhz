@@ -187,19 +187,18 @@ async def check_user_membership(user_id):
 def build_main_menu_keyboard(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     
-    # Row 1: Stock Stats & Claims
+    # Row 1: Claims & Referrals for Normal Users
     markup.row(
-        types.KeyboardButton(text='📦 Thống kê kho code'),
-        types.KeyboardButton(text='📋 Code đã nhận')
-    )
-    # Row 2: Referrals
-    markup.row(
+        types.KeyboardButton(text='📋 Code đã nhận'),
         types.KeyboardButton(text='👥 Thống kê mời bạn')
     )
 
-    # Row 3: Admin Panel (if Admin)
+    # Row 2: Admin Panel & Stock Stats (ONLY IF ADMIN)
     if is_admin(user_id):
-        markup.row(types.KeyboardButton(text='⚙️ BẢNG ĐIỀU KHIỂN ADMIN'))
+        markup.row(
+            types.KeyboardButton(text='📦 Thống kê kho code'),
+            types.KeyboardButton(text='⚙️ BẢNG ĐIỀU KHIỂN ADMIN')
+        )
 
     return markup
 
@@ -675,8 +674,12 @@ async def handle_messages(message):
             await bot.send_message(chat_id, "Chưa thiết lập link tham gia nhóm!")
         return
 
-    # Reply Button: "📦 Thống kê kho code"
+    # Reply Button: "📦 Thống kê kho code" (CHỈ DÀNH CHO ADMIN)
     if text == '📦 Thống kê kho code':
+        if not is_admin(user_id):
+            await bot.send_message(chat_id, "⛔ Chức năng Thống Kê Kho Code chỉ dành cho Admin!")
+            return
+
         conn = get_db()
         c = conn.cursor()
         c.execute('SELECT COUNT(*) as avail FROM gifcodes WHERE is_used = 0')
@@ -688,15 +691,12 @@ async def handle_messages(message):
         conn.close()
 
         reply = (
-            f"📦 <b>THỐNG KÊ KHO GIFCODE HOẠT ĐỘNG</b>\n\n"
+            f"⚙️ <b>THỐNG KÊ KHO GIFCODE (QUẢN TRỊ VIÊN)</b>\n\n"
             f"🟢 <b>Mã Code khả dụng trong kho:</b> <b>{avail_codes}</b> / {total_codes} code\n"
             f"🎁 <b>Tổng số lượt đã bốc thành công:</b> <b>{total_claims}</b> lượt\n\n"
-            f"👉 <i>Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để bốc thưởng ngay!</i>"
+            f"👇 <i>Dùng Bảng Quản Trị để nạp thêm code khi cần!</i>"
         )
-        miniapp_link = "https://t.me/trainghiemtanthu88k_bot/trainghiem88k"
-        inline_markup = types.InlineKeyboardMarkup()
-        inline_markup.add(types.InlineKeyboardButton("🎁 MỞ MINI APP NHẬN CODE 88K", url=miniapp_link))
-        await bot.send_message(chat_id, reply, parse_mode='HTML', reply_markup=inline_markup)
+        await bot.send_message(chat_id, reply, parse_mode='HTML')
         return
 
     # Reply Button: "📋 Code đã nhận"

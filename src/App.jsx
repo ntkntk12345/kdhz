@@ -544,35 +544,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Live Stock Statistics Card */}
-          <div className="crafted-card" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent-amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Gift size={16} color="var(--accent-amber)" />
-                <span>THỐNG KÊ KHO GIFCODE HOẠT ĐỘNG</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#10b981' }}>
-                <span className="live-pulse-dot" style={{ width: '8px', height: '8px', background: '#10b981' }} />
-                <span>Trực tiếp</span>
-              </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>CODE HOẠT ĐỘNG (KHO)</div>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#10b981' }}>
-                  {codeStats.available} <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>/ {codeStats.total}</span>
-                </div>
-              </div>
-
-              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>ĐÃ BỐC THÀNH CÔNG</div>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--accent-amber-light)' }}>
-                  {codeStats.used} <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>mã</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Rules Card */}
           {rulesText && (
