@@ -152,21 +152,32 @@ def format_preset_vars(html_text, context_vars=None):
 
     return text
 
-async def send_preset_or_fallback(chat_id, num_key, fallback_text=None, reply_markup=None, context_vars=None):
-    """Send preset message from settings.json with dynamic variables (name, ref link, stats)."""
+async def send_preset_or_fallback(chat_id, num_key, fallback_text=None, reply_markup=None, context_vars=None, photo_url=None):
+    """Send preset message from settings.json with dynamic variables (name, ref link, stats) and optional photo."""
     cfg = load_settings()
     presets = cfg.get('presetMessages', {})
     preset_data = presets.get(str(num_key))
+
+    saved_photo = photo_url
 
     if preset_data:
         saved_html = ""
         if isinstance(preset_data, dict):
             saved_html = preset_data.get('text_html') or preset_data.get('html', '')
+            if not saved_photo:
+                saved_photo = preset_data.get('photo_url') or preset_data.get('photo')
         elif isinstance(preset_data, str):
             saved_html = str(preset_data)
 
         if saved_html:
             formatted_html = format_preset_vars(saved_html, context_vars)
+            if saved_photo:
+                try:
+                    await bot.send_photo(chat_id, photo=saved_photo, caption=formatted_html, parse_mode='HTML', reply_markup=reply_markup)
+                    return True
+                except Exception as e:
+                    logger.warning(f"[PRESET] send_photo key={num_key} failed: {e}")
+
             try:
                 await bot.send_message(chat_id, formatted_html, parse_mode='HTML', reply_markup=reply_markup)
                 return True
@@ -180,6 +191,12 @@ async def send_preset_or_fallback(chat_id, num_key, fallback_text=None, reply_ma
 
     if fallback_text:
         formatted_fallback = format_preset_vars(fallback_text, context_vars)
+        if saved_photo:
+            try:
+                await bot.send_photo(chat_id, photo=saved_photo, caption=formatted_fallback, parse_mode='HTML', reply_markup=reply_markup)
+                return True
+            except Exception:
+                pass
         try:
             await bot.send_message(chat_id, formatted_fallback, parse_mode='HTML', reply_markup=reply_markup)
         except Exception:
