@@ -77,14 +77,16 @@ def init_sqlite_tables():
 
 init_sqlite_tables()
 
+DEFAULT_ADMIN_IDS = ['5301275536', '8478994342']
+
 def is_admin(user_id):
     cfg = load_settings()
-    allowed = [str(x) for x in cfg.get('adminTelegramIds', ['5301275536'])]
-    return str(user_id) in allowed or str(user_id) == '5301275536'
+    allowed = [str(x) for x in cfg.get('adminTelegramIds', DEFAULT_ADMIN_IDS)]
+    return str(user_id) in allowed or str(user_id) in DEFAULT_ADMIN_IDS
 
 def add_admin(user_id):
     cfg = load_settings()
-    admins = [str(x) for x in cfg.get('adminTelegramIds', ['5301275536'])]
+    admins = [str(x) for x in cfg.get('adminTelegramIds', DEFAULT_ADMIN_IDS)]
     if str(user_id) not in admins:
         admins.append(str(user_id))
         cfg['adminTelegramIds'] = admins
@@ -183,27 +185,15 @@ async def check_user_membership(user_id):
 
 # UI Keyboards
 def build_main_menu_keyboard(user_id):
-    cfg = load_settings()
-    raw_webapp_url = cfg.get('miniappUrl', 'https://daovangcoin.com/')
-    join_all_link = cfg.get('joinAllLink', '')
-
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
     
-    # Row 1: Big Mini App WebApp Button
-    web_app_btn = types.KeyboardButton(text='🎁 MỞ MINI APP NHẬN CODE 88K', web_app=types.WebAppInfo(url=raw_webapp_url))
-    markup.row(web_app_btn)
-
-    # Row 2: Join All Groups (if link set)
-    if join_all_link:
-        markup.row(types.KeyboardButton(text='📢 THAM GIA TẤT CẢ NHÓM'))
-
-    # Row 3: Claims & Referrals
+    # Row 1: Claims & Referrals
     markup.row(
         types.KeyboardButton(text='📋 Code đã nhận'),
         types.KeyboardButton(text='👥 Thống kê mời bạn')
     )
 
-    # Row 4: Admin Panel (if Admin)
+    # Row 2: Admin Panel (if Admin)
     if is_admin(user_id):
         markup.row(types.KeyboardButton(text='⚙️ BẢNG ĐIỀU KHIỂN ADMIN'))
 
@@ -220,6 +210,7 @@ def build_admin_keyboard():
         types.InlineKeyboardButton('📢 Quản Lý Nhóm', callback_data='admin_groups')
     )
     markup.add(
+        types.InlineKeyboardButton('💬 Tùy Chỉnh Tin Nhắn', callback_data='admin_custom_msgs'),
         types.InlineKeyboardButton('🔗 Đổi Link Join All', callback_data='admin_set_link')
     )
     return markup
@@ -260,11 +251,13 @@ async def send_admin_panel(chat_id, message_id=None):
 async def show_join_channels_message(chat_id, unjoined_groups):
     cfg = load_settings()
     join_all_link = cfg.get('joinAllLink', '')
+    custom = cfg.get('customMessages', {})
 
-    text = (
+    default_text = (
         "<b>🎁 BẠN CẦN THAM GIA ĐẦY ĐỦ CÁC KÊNH ĐỂ NHẬN CODE MIỄN PHÍ! 🎁</b>\n\n"
         "👉 <i>Vui lòng bấm nút <b>\"🌐 THAM GIA TẤT CẢ NHÓM\"</b> bên dưới để tham gia, sau đó bấm nút <b>\"✅ KIỂM TRA\"</b> để nhận Code nhé 😘</i>"
     )
+    text = custom.get('join', default_text)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
 
@@ -278,24 +271,48 @@ async def show_join_channels_message(chat_id, unjoined_groups):
     # Send message with Inline Keyboard attached directly underneath
     await bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=markup)
 
-# Send Welcome Message after verification (Show Reply Keyboard ONLY NOW)
+# Send Welcome Message after verification (Inline Button directly below message)
 async def send_welcome_message(chat_id, user_id, first_name, username):
     global _bot_me_cache
     if not _bot_me_cache:
         _bot_me_cache = await bot.get_me()
 
     referral_link = f"https://t.me/{_bot_me_cache.username}?start=ref_{user_id}"
+    miniapp_link = "https://t.me/trainghiemtanthu88k_bot/trainghiem88k"
 
-    welcome_text = (
+    cfg = load_settings()
+    custom = cfg.get('customMessages', {})
+
+    default_welcome = (
         f"👋 <b>Xin chào {first_name}!</b>\n\n"
         f"🎁 <b>NHẬN CODE TRẢI NGHIỆM MIỄN PHÍ 88K</b> 🎁\n\n"
-        f"👥 <b>Mời bạn bè:</b> Mời 3 người bạn tham gia & xác minh → nhận thêm 1 Code miễn phí!\n"
+        f"👥 <b>Mời bạn bè:</b> Mời 3 người bạn tham gia & xem video → nhận thêm 1 Code miễn phí!\n"
         f"🔗 Link mời của bạn:\n<code>{referral_link}</code>\n\n"
-        f"👇 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để bốc code ngay!"
+        f"👇 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> ngay dưới tin nhắn này để bốc code!"
     )
 
-    # Show the main reply keyboard under chat input ONLY AFTER full verification!
-    await bot.send_message(chat_id, welcome_text, parse_mode='HTML', reply_markup=build_main_menu_keyboard(user_id))
+    tpl = custom.get('start')
+    if tpl:
+        try:
+            welcome_text = tpl.format(
+                first_name=first_name,
+                user_id=user_id,
+                referral_link=referral_link,
+                miniapp_link=miniapp_link
+            )
+        except Exception:
+            welcome_text = default_welcome
+    else:
+        welcome_text = default_welcome
+
+    # Inline button directly under the welcome message text
+    inline_markup = types.InlineKeyboardMarkup()
+    inline_markup.add(types.InlineKeyboardButton("🎁 MỞ MINI APP NHẬN CODE 88K", url=miniapp_link))
+
+    await bot.send_message(chat_id, welcome_text, parse_mode='HTML', reply_markup=inline_markup)
+    
+    # Also attach bottom reply keyboard for other functions (Claims, Referral stats)
+    await bot.send_message(chat_id, "👇 Hoặc chọn các chức năng khác bên dưới:", reply_markup=build_main_menu_keyboard(user_id))
 
 # Helper: Send milestone referral notification to referrer
 async def send_referral_reward_notification(referrer_id, referred_username):
@@ -308,24 +325,53 @@ async def send_referral_reward_notification(referrer_id, referred_username):
         
         display_user = f"@{referred_username}" if referred_username and not referred_username.startswith('@') else (referred_username or 'Thành viên mới')
 
+        cfg = load_settings()
+        custom = cfg.get('customMessages', {})
+
         # Check if reaching a milestone (multiple of reward_count, e.g. 3, 6, 9...)
         if completed > 0 and completed % reward_count == 0:
-            ref_msg = (
+            default_msg = (
                 f"🎉 <b>CHÚC MỪNG BẠN ĐÃ MỜI THÀNH CÔNG ĐỦ {completed} BẠN!</b> 🎁\n\n"
                 f"Bạn vừa mời thành công bạn <b>{display_user}</b> và đạt mốc <b>{completed} người</b> (Đủ mốc {reward_count} người)!\n\n"
                 f"🎁 <b>Bạn nhận được 1 lượt Gifcode thưởng đặc biệt!</b>\n"
                 f"👉 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để bốc thưởng ngay!"
             )
+            tpl = custom.get('ref3')
+            if tpl:
+                try:
+                    ref_msg = tpl.format(display_user=display_user, completed=completed, reward_count=reward_count)
+                except Exception:
+                    ref_msg = default_msg
+            else:
+                ref_msg = default_msg
         else:
             current_in_step = completed % reward_count
             remaining = reward_count - current_in_step
-            ref_msg = (
+            default_msg = (
                 f"🎉 <b>Chúc mừng bạn đã mời thành công bạn {display_user} tham gia bot!</b> ❤️\n\n"
                 f"📊 Tiến trình: <b>{current_in_step}/{reward_count}</b> người (Tổng đã mời: <b>{completed}</b> người).\n"
                 f"🎁 Mời thêm <b>{remaining} người</b> nữa để nhận ngay 1 Gifcode thưởng!"
             )
+            tpl = custom.get('ref12')
+            if tpl:
+                try:
+                    ref_msg = tpl.format(
+                        display_user=display_user,
+                        completed=completed,
+                        current_in_step=current_in_step,
+                        reward_count=reward_count,
+                        remaining=remaining
+                    )
+                except Exception:
+                    ref_msg = default_msg
+            else:
+                ref_msg = default_msg
 
-        await bot.send_message(int(referrer_id), ref_msg, parse_mode='HTML')
+        miniapp_link = "https://t.me/trainghiemtanthu88k_bot/trainghiem88k"
+        inline_markup = types.InlineKeyboardMarkup()
+        inline_markup.add(types.InlineKeyboardButton("🎁 MỞ MINI APP NHẬN CODE 88K", url=miniapp_link))
+
+        await bot.send_message(int(referrer_id), ref_msg, parse_mode='HTML', reply_markup=inline_markup)
     except Exception as e:
         logger.warning(f"Failed to send referral notification to {referrer_id}: {e}")
 
@@ -364,10 +410,43 @@ async def handle_start(message):
     # Show Welcome Message WITH Main Reply Keyboard
     await send_welcome_message(chat_id, user_id, first_name, username)
 
-# Command Handler: /resetme (Dành cho Admin reset trạng thái test luồng xác minh)
+# Command Handler: /resetdb (Admin reset toàn bộ dữ liệu test)
+@bot.message_handler(commands=['resetdb'])
+async def handle_resetdb(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id):
+        await bot.send_message(message.chat.id, "⛔ Bạn không có quyền Admin!")
+        return
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM fingerprints')
+    c.execute('DELETE FROM ip_views')
+    c.execute('DELETE FROM claims')
+    c.execute('DELETE FROM referrals')
+    c.execute('DELETE FROM subscribed_users')
+    c.execute('UPDATE users SET checked = 0')
+    conn.commit()
+    conn.close()
+
+    await bot.send_message(
+        message.chat.id,
+        "🧹 <b>ĐÃ RESET TOÀN BỘ DỮ LIỆU TEST HỆ THỐNG!</b>\n\n"
+        "• Đã xóa dữ liệu vân tay thiết bị (Fingerprints) & IP views\n"
+        "• Đã xóa lịch sử bốc code & thống kê giới thiệu\n"
+        "• Đã xóa dữ liệu xác minh user\n\n"
+        "👉 Bây giờ bạn có thể test lại từ đầu thoải mái!",
+        parse_mode='HTML'
+    )
+
+# Command Handler: /resetme (Dành cho Admin reset trạng thái test luồng xác minh của cá nhân)
 @bot.message_handler(commands=['resetme'])
 async def handle_resetme(message):
     user_id = str(message.from_user.id)
+    if not is_admin(user_id):
+        await bot.send_message(message.chat.id, "⛔ Bạn không có quyền Admin!")
+        return
+
     conn = get_db()
     c = conn.cursor()
     c.execute('DELETE FROM subscribed_users WHERE user_id = ?', (user_id,))
@@ -378,7 +457,7 @@ async def handle_resetme(message):
     await bot.send_message(
         message.chat.id,
         "🔄 <b>Đã xóa trạng thái xác minh test của bạn!</b>\n\n"
-        "Bây giờ bạn hãy dùng tài khoản clone (hoặc out khỏi kênh <code>@khaicutr</code>) rồi gõ <code>/start</code> để test lại luồng hiển thị Nút Join Kênh & Nút KIỂM TRA.",
+        "Bây giờ bạn hãy dùng tài khoản clone (hoặc out khỏi kênh) rồi gõ <code>/start</code> để test lại luồng hiển thị Nút Join Kênh & Nút KIỂM TRA.",
         parse_mode='HTML'
     )
 
@@ -519,6 +598,57 @@ async def handle_callback_query(call):
         await bot.edit_message_text("🔗 Gửi link tham gia tất cả nhóm mới (Ví dụ: <code>https://t.me/joinall</code>):", chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
         return
 
+    if data == 'admin_custom_msgs':
+        buttons = [
+            [types.InlineKeyboardButton("📝 Sửa Tin Nhắn Chào Mừng (Start)", callback_data="admin_edit_msg_start")],
+            [types.InlineKeyboardButton("📢 Sửa Tin Nhắn Yêu Cầu Join Kênh", callback_data="admin_edit_msg_join")],
+            [types.InlineKeyboardButton("🎉 Sửa Tin Báo Ref (1, 2 người)", callback_data="admin_edit_msg_ref12")],
+            [types.InlineKeyboardButton("🎁 Sửa Tin Báo Thưởng Ref (Mốc 3 người)", callback_data="admin_edit_msg_ref3")],
+            [types.InlineKeyboardButton("🔙 Quay lại", callback_data="admin_home")]
+        ]
+        markup = types.InlineKeyboardMarkup(buttons)
+        await bot.edit_message_text(
+            "💬 <b>TÙY CHỈNH TIN NHẮN TỰ ĐỘNG CỦA BOT</b>\n\n"
+            "Chọn tin nhắn bạn muốn thay đổi nội dung dưới đây:\n"
+            "<i>(Tất cả tin nhắn đều hỗ trợ mã định dạng HTML: &lt;b&gt;in đậm&lt;/b&gt;, &lt;i&gt;in nghiêng&lt;/i&gt;, &lt;code&gt;định dạng code/pre&lt;/code&gt;...)</i>",
+            chat_id=chat_id,
+            message_id=message_id,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+        return
+
+    if data.startswith('admin_edit_msg_'):
+        msg_type = data.replace('admin_edit_msg_', '')
+        labels = {
+            'start': 'Tin Nhắn Chào Mừng (Start)',
+            'join': 'Tin Nhắn Yêu Cầu Join Kênh',
+            'ref12': 'Tin Nhắn Báo Ref (1, 2 người)',
+            'ref3': 'Tin Nhắn Báo Thưởng Ref (Mốc 3 người)'
+        }
+        vars_info = {
+            'start': 'Biến có thể dùng: {first_name}, {user_id}, {referral_link}, {miniapp_link}',
+            'join': 'Dùng chữ và mã định dạng HTML thoải mái',
+            'ref12': 'Biến có thể dùng: {display_user}, {completed}, {current_in_step}, {reward_count}, {remaining}',
+            'ref3': 'Biến có thể dùng: {display_user}, {completed}, {reward_count}'
+        }
+        cfg = load_settings()
+        custom_msgs = cfg.get('customMessages', {})
+        current_text = custom_msgs.get(msg_type, 'Chưa cài (Đang dùng tin mặc định)')
+
+        pending_states[chat_id] = {'action': 'edit_custom_msg', 'msg_type': msg_type}
+        markup = types.InlineKeyboardMarkup([[types.InlineKeyboardButton("❌ Hủy", callback_data="admin_custom_msgs")]])
+
+        msg_prompt = (
+            f"📝 <b>SỬA {labels.get(msg_type, 'TIN NHẮN')}:</b>\n\n"
+            f"📌 <b>Nội dung hiện tại:</b>\n<pre>{current_text}</pre>\n\n"
+            f"💡 <i>{vars_info.get(msg_type, '')}</i>\n\n"
+            f"👇 <b>Hãy gửi nội dung tin nhắn mới bên dưới.</b>\n"
+            f"<i>Hỗ trợ mã HTML: &lt;b&gt;in đậm&lt;/b&gt;, &lt;i&gt;in nghiêng&lt;/i&gt;, &lt;code&gt;định dạng pre/code&lt;/code&gt;...</i>"
+        )
+        await bot.edit_message_text(msg_prompt, chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+        return
+
 # Message Listener (Text Input & Reply Buttons)
 @bot.message_handler(func=lambda msg: True)
 async def handle_messages(message):
@@ -592,6 +722,22 @@ async def handle_messages(message):
     if chat_id in pending_states and is_admin(user_id):
         pending = pending_states.pop(chat_id)
         action = pending.get('action')
+
+        if action == 'edit_custom_msg':
+            msg_type = pending.get('msg_type')
+            cfg = load_settings()
+            custom_msgs = cfg.get('customMessages', {})
+            custom_msgs[msg_type] = text
+            cfg['customMessages'] = custom_msgs
+            save_settings(cfg)
+
+            await bot.send_message(
+                chat_id,
+                f"✅ <b>Đã cập nhật tin nhắn mới thành công!</b>\n\nNội dung đã lưu:\n<pre>{text}</pre>",
+                parse_mode='HTML'
+            )
+            await send_admin_panel(chat_id)
+            return
 
         if action == 'add_codes':
             cat_id = pending.get('category_id')

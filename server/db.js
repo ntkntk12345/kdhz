@@ -537,8 +537,6 @@ export const db = {
       'INSERT INTO ip_views (id, ip, user_id, step, viewed_at) VALUES (?, ?, ?, ?, ?)',
       [id, ip, String(userId), step || 1, now]
     );
-    // Automatically trigger referral completion check
-    await db.markReferralCompleted(userId);
   },
 
   // Kiểm tra IP có bị chặn không
@@ -561,21 +559,28 @@ export const db = {
 
   // ─── FINGERPRINT TRACKING ────────────────────────────────────────────────────
 
-  // Kiểm tra fingerprint có bị chặn không
+  // Kiểm tra fingerprint có bị chặn không (Hạn dùng 24h, cho phép nick chính quay lại thoải mái)
   checkFingerprint: async (fingerprint, userId) => {
     if (!fingerprint) return { blocked: false };
 
+    const now = Date.now();
+    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
+
+    // Kiểm tra xem có TÀI KHOẢN KHÁC dùng thiết bị này trong vòng 24h qua không
     const existing = await dbGet(
-      'SELECT * FROM fingerprints WHERE fingerprint = ? AND user_id != ?',
+      'SELECT * FROM fingerprints WHERE fingerprint = ? AND user_id != ? ORDER BY last_seen DESC LIMIT 1',
       [fingerprint, String(userId)]
     );
 
-    if (existing) {
-      return { blocked: true, reason: 'fingerprint_duplicate', originalUserId: existing.user_id };
+    if (existing && existing.last_seen) {
+      const lastSeenTime = new Date(existing.last_seen).getTime();
+      if (now - lastSeenTime < cooldownMs) {
+        return { blocked: true, reason: 'fingerprint_duplicate', originalUserId: existing.user_id };
+      }
     }
 
-    // Upsert fingerprint record
-    const now = new Date().toISOString();
+    // Upsert fingerprint record cho user hiện tại
+    const nowIso = new Date().toISOString();
     const existing2 = await dbGet('SELECT * FROM fingerprints WHERE fingerprint = ? AND user_id = ?', [fingerprint, String(userId)]);
     if (existing2) {
       await dbRun('UPDATE fingerprints SET last_seen = ? WHERE fingerprint = ? AND user_id = ?', [now, fingerprint, String(userId)]);

@@ -5,7 +5,8 @@
   "adDurationSeconds": 15,
   "dailyLimitPerUser": 10,
   "adminTelegramIds": [
-    "5301275536"
+    "5301275536",
+    "8478994342"
   ],
   "requiredGroups": [
     "@khaicutr"

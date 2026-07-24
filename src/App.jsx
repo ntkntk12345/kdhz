@@ -255,6 +255,19 @@ export default function App() {
     }
   };
 
+  // Restore saved videoStep progress on reload / re-open
+  useEffect(() => {
+    if (userId && userId !== 'user-web') {
+      const savedStep = localStorage.getItem(`videoStep_${userId}`);
+      if (savedStep && !isNaN(savedStep)) {
+        const parsed = parseInt(savedStep, 10);
+        if (parsed >= 1 && parsed <= 5) {
+          setVideoStep(parsed);
+        }
+      }
+    }
+  }, [userId]);
+
   // Callback when user completes video ad in modal
   const handleAdStepComplete = async () => {
     // Record video step completion on server for referral tracking & security
@@ -272,11 +285,15 @@ export default function App() {
 
     if (videoStep < 5) {
       // Completed Video 1/5, 2/5, 3/5, 4/5 → start 15s inter-ad rest
+      const nextStep = videoStep + 1;
       setShowAdModal(false);
       soundFx.playTap();
       triggerHaptic('light');
       setInterAdCooldown(15); // 15s rest before next video
-      setVideoStep(prev => prev + 1);
+      setVideoStep(nextStep);
+      if (userId && userId !== 'user-web') {
+        localStorage.setItem(`videoStep_${userId}`, String(nextStep));
+      }
     } else {
       // Completed Video 5/5 (Final step to claim code)
       try {
@@ -296,6 +313,9 @@ export default function App() {
         if (data.success) {
           setShowAdModal(false);
           setVideoStep(1); // Reset step counter
+          if (userId && userId !== 'user-web') {
+            localStorage.removeItem(`videoStep_${userId}`);
+          }
           soundFx.playWinFanfare();
           triggerHaptic('success');
           setClaimResult(data);
