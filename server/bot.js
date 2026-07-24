@@ -19,6 +19,54 @@ export function setupTelegramBot() {
     // Track pending input states (chatId -> { action, categoryId, etc. })
     const pendingState = new Map();
 
+    function extractMessageHtml(msg) {
+      const text = msg.text || msg.caption || '';
+      const entities = msg.entities || msg.caption_entities;
+      if (!entities || entities.length === 0 || !text) return text;
+
+      try {
+        const buf = Buffer.from(text, 'utf16le');
+        const insertions = {};
+
+        entities.forEach(entity => {
+          const startByte = entity.offset * 2;
+          const endByte = (entity.offset + entity.length) * 2;
+
+          let openTag = '', closeTag = '';
+          if (entity.type === 'bold') { openTag = '<b>'; closeTag = '</b>'; }
+          else if (entity.type === 'italic') { openTag = '<i>'; closeTag = '</i>'; }
+          else if (entity.type === 'code') { openTag = '<code>'; closeTag = '</code>'; }
+          else if (entity.type === 'pre') { openTag = '<pre>'; closeTag = '</pre>'; }
+          else if (entity.type === 'underline') { openTag = '<u>'; closeTag = '</u>'; }
+          else if (entity.type === 'strikethrough') { openTag = '<s>'; closeTag = '</s>'; }
+          else if (entity.type === 'text_link') { openTag = `<a href="${entity.url}">`; closeTag = '</a>'; }
+
+          if (openTag && closeTag) {
+            if (!insertions[startByte]) insertions[startByte] = [];
+            insertions[startByte].push(openTag);
+
+            if (!insertions[endByte]) insertions[endByte] = [];
+            insertions[endByte].unshift(closeTag);
+          }
+        });
+
+        const resultChunks = [];
+        for (let i = 0; i < buf.length; i += 2) {
+          if (insertions[i]) {
+            insertions[i].forEach(tag => resultChunks.push(Buffer.from(tag, 'utf16le')));
+          }
+          resultChunks.push(buf.slice(i, i + 2));
+        }
+        if (insertions[buf.length]) {
+          insertions[buf.length].forEach(tag => resultChunks.push(Buffer.from(tag, 'utf16le')));
+        }
+
+        return Buffer.concat(resultChunks).toString('utf16le');
+      } catch (err) {
+        return text;
+      }
+    }
+
     // Helper: Check Telegram Group Membership for a User
     async function checkUserMembership(userId) {
       const settings = db.getSettings();
@@ -143,35 +191,99 @@ export function setupTelegramBot() {
       }
     }
 
+    async function sendPresetOrFallback(chatId, presetKey, fallbackHtml) {
+      const settings = db.getSettings();
+      const presets = settings.presetMessages || {};
+      const presetData = presets[String(presetKey)];
+
+      if (presetData) {
+        if (typeof presetData === 'object' && presetData !== null) {
+          const savedChat = presetData.chat_id;
+          const savedMsg = presetData.message_id;
+          const savedHtml = presetData.html || '';
+
+          if (savedChat && savedMsg) {
+            try {
+              await bot.copyMessage(chatId, savedChat, savedMsg);
+              return true;
+            } catch (err) {}
+          }
+
+          if (savedHtml) {
+            try {
+              await bot.sendMessage(chatId, savedHtml, { parse_mode: 'HTML' });
+              return true;
+            } catch (err) {}
+          }
+        } else if (typeof presetData === 'string') {
+          try {
+            await bot.sendMessage(chatId, String(presetData), { parse_mode: 'HTML' });
+            return true;
+          } catch (err) {}
+        }
+      }
+
+      if (fallbackHtml) {
+        await bot.sendMessage(chatId, fallbackHtml, { parse_mode: 'HTML' });
+      }
+      return false;
+    }
+
     // Send Welcome Message after membership verification passes
     async function sendWelcomeAfterSubscribed(chatId, userId, firstName) {
       const currentSettings = db.getSettings();
-      const categories = await db.getCategories();
-      const activeCategories = categories.filter(c => c.active);
-      const catListStr = activeCategories.map(c => `• <b>${c.name}</b>: ${c.description || 'Xem ad nhận code'}`).join('\n');
+      const presets = currentSettings.presetMessages || {};
 
-      const botMe = await bot.getMe();
-      const referralLink = `https://t.me/${botMe.username}?start=ref_${userId}`;
+      // Preset 1 → tin nhắn chào mừng
+      const preset1 = presets['1'];
+      let welcomeText = '';
+      if (preset1) {
+        welcomeText = typeof preset1 === 'object' ? (preset1.html || '') : String(preset1);
+      } else {
+        const botMe = await bot.getMe();
+        const referralLink = `https://t.me/${botMe.username}?start=ref_${userId}`;
+        welcomeText = `👋 <b>Xin chào ${firstName}!</b>\n\n` +
+          `🎁 <b>NHẬN CODE TRẢI NGHIỆM MIỄN PHÍ 88K</b> 🎁\n\n` +
+          `👥 <b>Mời bạn bè:</b> Mời 3 người bạn xem đủ video → nhận thêm 1 Code miễn phí!\n` +
+          `🔗 Link mời của bạn:\n<code>${referralLink}</code>\n\n` +
+          `👇 Nhấn nút menu <b>"🎁 MỞ MINI APP NHẬN CODE 88K"</b> ở dưới khung chat để bắt đầu!`;
+      }
 
-      let welcomeText = `👋 <b>Xin chào ${firstName}!</b>\n\n` +
-        `🎁 <b>NHẬN CODE TRẢI NGHIỆM MIỄN PHÍ 88K</b> 🎁\n\n` +
-        `Các danh mục hỗ trợ:\n${catListStr}\n\n` +
-        `👥 <b>Mời bạn bè:</b> Mời 3 người bạn xem đủ video → nhận thêm 1 Code miễn phí!\n` +
-        `🔗 Link mời của bạn:\n<code>${referralLink}</code>\n\n` +
-        `👇 Nhấn nút menu <b>"🎁 MỞ MINI APP NHẬN CODE 88K"</b> ở dưới khung chat để bắt đầu!`;
+      if (welcomeText) {
+        bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' }).catch(() => {
+          bot.sendMessage(chatId, welcomeText);
+        });
+      }
 
-      bot.sendMessage(chatId, welcomeText, {
+      // Preset 2 → thay "👇 Hoặc chọn các chức năng khác bên dưới:"
+      const preset2 = presets['2'];
+      const menuText = preset2
+        ? (typeof preset2 === 'object' ? (preset2.html || '') : String(preset2))
+        : '👇 Hoặc chọn các chức năng khác bên dưới:';
+
+      bot.sendMessage(chatId, menuText, {
         parse_mode: 'HTML',
         reply_markup: buildMainMenuKeyboard(userId)
-      }).catch(err => {
-        console.error('❌ Error sending welcome response:', err.message);
+      }).catch(() => {
+        bot.sendMessage(chatId, menuText, { reply_markup: buildMainMenuKeyboard(userId) });
       });
     }
 
-    // Send Group Membership Gate Message (with individual channel buttons like mb66.py)
+    // Send Group Membership Gate Message
     function sendMembershipGateMessage(chatId, missingGroups) {
       const settings = db.getSettings();
       const joinAllLink = settings.joinAllLink || '';
+      const presets = settings.presetMessages || {};
+
+      // Preset 5 → tin nhắn yêu cầu tham gia kênh
+      const preset5 = presets['5'];
+      if (preset5) {
+        const html5 = typeof preset5 === 'object' ? (preset5.html || '') : String(preset5);
+        if (html5) {
+          bot.sendMessage(chatId, html5, { parse_mode: 'HTML' }).catch(() => bot.sendMessage(chatId, html5));
+          return;
+        }
+      }
 
       let text = `‼️ <b>VUI LÒNG THAM GIA ĐẦY ĐỦ CÁC KÊNH / NHÓM BẮT BUỘC</b> ‼️\n\n` +
         `Để mở khóa Mini App & Nhận Gifcode 88K, bạn cần tham gia đầy đủ các kênh chính thức bên dưới:\n\n`;
@@ -300,6 +412,41 @@ export function setupTelegramBot() {
       }
     });
 
+    // Command Handler: /set1, /set2 ... /setN (Admin set preset pre message)
+    bot.onText(/\/set(\d+)(?:\s+([\s\S]+))?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const senderId = String(msg.from?.id);
+      if (senderId === '5301275536') db.addAdminTelegramId(senderId);
+
+      if (!db.isAdminTelegram(senderId)) {
+        bot.sendMessage(chatId, '⛔ Bạn không có quyền Admin!');
+        return;
+      }
+
+      const numKey = match[1];
+      const content = match[2] ? match[2].trim() : '';
+
+      if (content) {
+        const settings = db.getSettings();
+        if (!settings.presetMessages) settings.presetMessages = {};
+        settings.presetMessages[numKey] = content;
+        db.updateSettings(settings);
+
+        bot.sendMessage(
+          chatId,
+          `✅ <b>ĐÃ LƯU TIN NHẮN MẪU SỐ ${numKey}!</b>\n\nNội dung đã lưu:\n${content}`,
+          { parse_mode: 'HTML' }
+        );
+      } else {
+        pendingState.set(chatId, { action: 'set_preset_msg', numKey });
+        bot.sendMessage(
+          chatId,
+          `📝 <b>[SET ${numKey}]</b> Hãy gửi tin nhắn bạn muốn lưu làm mẫu tin nhắn số <b>${numKey}</b>:`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    });
+
     bot.onText(/\/addcode/, async (msg) => {
       const senderId = String(msg.from?.id);
       if (senderId === '5301275536') db.addAdminTelegramId(senderId);
@@ -319,6 +466,70 @@ export function setupTelegramBot() {
       const senderId = String(msg.from?.id);
       const text = msg.text.trim();
 
+      // Pending Admin Input: set_preset_msg
+      const pending = pendingState.get(chatId);
+      if (pending && pending.action === 'set_preset_msg' && (db.isAdminTelegram(senderId) || senderId === '5301275536')) {
+        const numKey = pending.numKey || '1';
+        const htmlContent = extractMessageHtml(msg);
+        const settings = db.getSettings();
+        if (!settings.presetMessages) settings.presetMessages = {};
+        settings.presetMessages[numKey] = {
+          html: htmlContent,
+          chat_id: msg.chat.id,
+          message_id: msg.message_id
+        };
+        db.updateSettings(settings);
+        pendingState.delete(chatId);
+
+        bot.sendMessage(
+          chatId,
+          `✅ <b>ĐÃ LƯU TIN NHẮN MẪU SỐ ${numKey}!</b>\n\nBấm nút hoặc gõ <b>${numKey}</b> để phát lại tin nhắn này bất kỳ lúc nào.`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      // Check if text is a number trigger for preset message (e.g. "1", "2", "/1", "/2", "set1")
+      const numMatch = text.match(/^(?:\/)?(?:set)?(\d+)$/i);
+      if (numMatch) {
+        const numKey = numMatch[1];
+        const settings = db.getSettings();
+        const presets = settings.presetMessages || {};
+
+        if (presets[numKey]) {
+          const presetData = presets[numKey];
+
+          if (typeof presetData === 'object' && presetData !== null) {
+            const savedChat = presetData.chat_id;
+            const savedMsg = presetData.message_id;
+            const savedHtml = presetData.html || '';
+
+            if (savedChat && savedMsg) {
+              bot.copyMessage(chatId, savedChat, savedMsg).then(() => {}).catch(() => {
+                if (savedHtml) {
+                  bot.sendMessage(chatId, savedHtml, { parse_mode: 'HTML' }).catch(() => {
+                    bot.sendMessage(chatId, savedHtml);
+                  });
+                }
+              });
+              return;
+            }
+
+            if (savedHtml) {
+              bot.sendMessage(chatId, savedHtml, { parse_mode: 'HTML' }).catch(() => {
+                bot.sendMessage(chatId, savedHtml);
+              });
+              return;
+            }
+          } else {
+            bot.sendMessage(chatId, String(presetData), { parse_mode: 'HTML' }).catch(() => {
+              bot.sendMessage(chatId, String(presetData));
+            });
+            return;
+          }
+        }
+      }
+
       // Bấm nút Reply Keyboard: "📦 Thống kê kho code" (CHỈ DÀNH CHO ADMIN)
       if (text === '📦 Thống kê kho code') {
         const isAdmin = db.isAdminTelegram(senderId) || String(senderId) === '5301275536';
@@ -329,12 +540,12 @@ export function setupTelegramBot() {
 
         try {
           const stats = await db.getTotalCodeStats();
-          const replyText = `⚙️ <b>THỐNG KÊ KHO GIFCODE (QUẢN TRỊ VIÊN)</b>\n\n` +
+          const fallbackText = `⚙️ <b>THỐNG KÊ KHO GIFCODE (QUẢN TRỊ VIÊN)</b>\n\n` +
             `🟢 <b>Mã Code khả dụng trong kho:</b> <b>${stats.available}</b> / ${stats.total} code\n` +
             `🎁 <b>Đã bốc thành công:</b> <b>${stats.used}</b> mã\n\n` +
             `👇 <i>Sử dụng Bảng Quản Trị để nạp thêm code khi cần!</i>`;
 
-          bot.sendMessage(chatId, replyText, { parse_mode: 'HTML' });
+          await sendPresetOrFallback(chatId, '5', fallbackText);
         } catch (err) {
           bot.sendMessage(chatId, `❌ Lỗi lấy thống kê kho: ${err.message}`);
         }
@@ -346,7 +557,9 @@ export function setupTelegramBot() {
         try {
           const claims = await db.getClaims(senderId);
           if (!claims || claims.length === 0) {
-            bot.sendMessage(chatId, 'Bạn chưa nhận code nào. Hãy mở MiniApp xem ad nhận code ngay!');
+            // Preset 4 for empty Code đã nhận
+            const defaultEmpty = "‼️ <b><i>Bạn chưa nhận code nào cả. Hãy mở MiniApp làm nhiệm vụ xem video nhận code ngay nào 🎉</i></b>";
+            await sendPresetOrFallback(chatId, '4', defaultEmpty);
           } else {
             let replyText = `🎁 <b>DANH SÁCH CODE BẠN ĐÃ NHẬN:</b>\n\n`;
             claims.slice(0, 10).forEach((c, idx) => {
@@ -367,15 +580,15 @@ export function setupTelegramBot() {
           const botMe = await bot.getMe();
           const referralLink = `https://t.me/${botMe.username}?start=ref_${senderId}`;
 
-          const replyText = `👥 <b>THỐNG KÊ MỜI BẠN BÈ</b>\n\n` +
-            `🔗 Link mời của bạn:\n<code>${referralLink}</code>\n\n` +
-            `📊 Tổng đã mời: <b>${stats.total}</b>\n` +
-            `✅ Hoàn thành (xem đủ video): <b>${stats.completed}</b>\n` +
-            `⏳ Chờ hoàn thành: <b>${stats.pending}</b>\n\n` +
-            `🎁 Cần mời đủ <b>${stats.rewardCount}</b> người hoàn thành → nhận 1 Code thưởng\n` +
-            `🏆 Code thưởng đã kiếm được: <b>${stats.rewardsEarned}</b>`;
+          const fallbackText = `📊 <b>THỐNG KÊ MỜI BẠN BÈ</b>\n\n` +
+            `✅ <b>Link Mời bạn bè:</b>\n<code>${referralLink}</code>\n\n` +
+            `👉 Tổng đã mời: <b>${stats.total}</b> người\n` +
+            `✅ Đã tham gia & xác minh: <b>${stats.completed}</b> người\n` +
+            `⏳ Chờ xác minh: <b>${stats.pending}</b> người\n\n` +
+            `🎁 Số Code Đã Được Nhận: <b>${stats.rewardsEarned}</b>`;
 
-          bot.sendMessage(chatId, replyText, { parse_mode: 'HTML' });
+          // Preset 3 for Thống kê mời bạn!
+          await sendPresetOrFallback(chatId, '3', fallbackText);
         } catch (err) {
           bot.sendMessage(chatId, 'Lỗi tải thống kê referral!');
         }

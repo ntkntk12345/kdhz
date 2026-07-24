@@ -15,5 +15,47 @@
   "referralRewardCount": 3,
   "referralMinVideos": 3,
   "maxIpViews": 5,
-  "rulesText": "1. Mỗi lượt xem đủ video quảng cáo sẽ nhận ngay 1 Gifcode may mắn ngẫu nhiên.\n2. Mỗi mã Gifcode chỉ được sử dụng 1 lần cho tài khoản tương ứng.\n3. Vui lòng dán mã code vào mục Khuyến Mãi để nhận thưởng lập tức.\n4. Nghiêm cấm sử dụng công cụ gian lận, hệ thống sẽ tự động khóa tài khoản vi phạm."
+  "rulesText": "1. Mỗi lượt xem đủ video quảng cáo sẽ nhận ngay 1 Gifcode may mắn ngẫu nhiên.\n2. Mỗi mã Gifcode chỉ được sử dụng 1 lần cho tài khoản tương ứng.\n3. Vui lòng dán mã code vào mục Khuyến Mãi để nhận thưởng lập tức.\n4. Nghiêm cấm sử dụng công cụ gian lận, hệ thống sẽ tự động khóa tài khoản vi phạm.",
+  "presetMessages": {
+    "1": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5208541126583136130\">🎉</tg-emoji> <b>Chào Mừng Bạn Yêu ( Tên ), Đã Tham Gia Bot Phát Code 6623 Miễn Phí </b><b><tg-emoji emoji-id=\"6287284302560368766\">💥</tg-emoji></b>\n\n<tg-emoji emoji-id=\"5440660757194744323\">‼️</tg-emoji> <b>Hãy Chia Sẽ Mời Bạn Bè Tham Gia Làm Nhiệm Vụ Nhận Giftcode Miễn Phí Nhé </b><b><tg-emoji emoji-id=\"6133963371776580882\">❤️</tg-emoji></b>\n\n<tg-emoji emoji-id=\"6043992250831082249\">✅</tg-emoji><b>Link</b> <b>Mời bạn bè:</b> \n( Link )\n\n<tg-emoji emoji-id=\"5213125716408808971\">🛑</tg-emoji> <b>Điều Kiện : Mời 3 Bạn Bè Tham Gia Mở MiniApp Lên Xem Video Nhận Thêm 1 Mã Giftcode Free </b><b><tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji></b>\n\n<tg-emoji emoji-id=\"6253454996948392250\">👇</tg-emoji> Bấm Nút <b>\"</b><tg-emoji emoji-id=\"5449800250032143374\">🎁</tg-emoji> <b>MỞ MINI APP \"</b> Bên Dưới Này Để Xem Video Nhận Code Miễn Phí Nhé Xem 5 Video Nhận 1 Mã Code Free <tg-emoji emoji-id=\"5208541126583136130\">🎉</tg-emoji>\n----(<tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji><tg-emoji emoji-id=\"5051117887851333174\">⬇️</tg-emoji>)----"
+    },
+    "2": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"6329864110116705243\">✅</tg-emoji> <b>Hãy Tham Khảo Các Chức Năng Khác Của Bot Bên Dưới Nhé</b><b><tg-emoji emoji-id=\"5231102735817918643\">👇</tg-emoji></b><b>:</b>"
+    },
+    "3": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5190806721286657692\">📊</tg-emoji> <b>THỐNG KÊ MỜI BẠN BÈ</b>\n\n<tg-emoji emoji-id=\"6043992250831082249\">✅</tg-emoji><b>Link</b> <b>Mời bạn bè:</b> \n<code>https://t.me/trainghiemtanthu88k_bot?start=ref_8478994342</code>\n\n<tg-emoji emoji-id=\"6210875657543488483\">👉</tg-emoji> Tổng đã mời: <b>0</b> người\n<tg-emoji emoji-id=\"5881732578276282078\">✅</tg-emoji>Đã tham gia & xác minh: <b>0</b> người\n⏳ Chờ xác minh: <b>0</b> người\n\n<tg-emoji emoji-id=\"5213125716408808971\">🛑</tg-emoji> <b>Điều Kiện : Mời 3 Bạn Bè Tham Gia Mở MiniApp Lên Xem Video Nhận Thêm 1 Mã Giftcode Free </b><b><tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji></b>\n\n<tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji> Số Code Đã Được Nhận : <b>0</b>"
+    },
+    "4": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5440660757194744323\">‼️</tg-emoji> <b><i>Bạn chưa nhận code nào cả. Hãy mở MiniApp làm nhiệm vụ xem video nhận code ngay nào </i></b><b><i><tg-emoji emoji-id=\"5208541126583136130\">🎉</tg-emoji></i></b>"
+    },
+    "5": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5352825278672412291\">✅</tg-emoji> <b>BẠN CẦN THAM GIA ĐẦY ĐỦ CÁC KÊNH ĐỂ NHẬN CODE MIỄN PHÍ! </b><tg-emoji emoji-id=\"6328094428971932747\">🆗</tg-emoji>\n\n<tg-emoji emoji-id=\"5215556805337296157\">➡️</tg-emoji> <i>Vui lòng bấm nút </i><i><b>\"🌐 THAM GIA TẤT CẢ NHÓM\"</b> bên dưới để tham gia, sau đó bấm nút </i><i><b>\"✅ KIỂM TRA\"</b> để nhận Code nhé </i><tg-emoji emoji-id=\"5406926593698312391\">❤️</tg-emoji>"
+    },
+    "6": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji> <b>Vui lòng thực hiện các bước sau để nhận GIFTCODE:\n\n</b><tg-emoji emoji-id=\"6062023850684584806\">▶️</tg-emoji> <b>Ví dụ: </b><b>/nhancode</b><b> [ Tài Khoản Game] (số tiền rút)\n\n</b><tg-emoji emoji-id=\"5420323339723881652\">⚠️</tg-emoji> <b>Lưu ý: Hệ thống sẽ phát code ngẫu nhiên 8-999K. Chúc bạn win game thắng lớn 🎊</b>"
+    },
+    "7": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji> <b>Mời Bạn Bè Càng Nhiều </b><b><tg-emoji emoji-id=\"5404573776253825754\">🍬</tg-emoji></b><b>\n</b><b><tg-emoji emoji-id=\"5280915586128307520\">🎉</tg-emoji></b><b> Rinh Code Càng Khủng </b><b><tg-emoji emoji-id=\"5280591122823930032\">🎉</tg-emoji></b><b>\n\n</b><b><tg-emoji emoji-id=\"5258269142699489886\">🌈</tg-emoji></b><b> Mã Giftcode Nè</b><b><tg-emoji emoji-id=\"5231102735817918643\">👇</tg-emoji></b><b>:\n👉 {code}\n\n</b><b><tg-emoji emoji-id=\"5215695279377884733\">➡️</tg-emoji></b><b>Link Nhập Code : \n{link game}\n\n</b><b><tg-emoji emoji-id=\"5258040062028822951\">🍀</tg-emoji></b><b> Chúc Bạn Chơi Game Vui Vẻ Thắng Lớn Cùng Bot Chưa Set Tên Nhé </b><b><tg-emoji emoji-id=\"5785412486349983037\">👍</tg-emoji></b>"
+    },
+    "8": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5449800250032143374\">🎁</tg-emoji> <b>ĐIỂM DANH HÀNG NGÀY\n\n</b><b><tg-emoji emoji-id=\"5787398350378635215\">👋</tg-emoji></b><b> Bạn đã điểm danh ngày hôm nay rồi </b><b><tg-emoji emoji-id=\"5785412486349983037\">👍</tg-emoji></b><b>\n</b><b><tg-emoji emoji-id=\"5424972470023104089\">🔥</tg-emoji></b><b> Streak hiện tại: 1/7 ngày\n</b><b><tg-emoji emoji-id=\"5413879192267805083\">🗓</tg-emoji></b><b> Vui lòng quay lại vào ngày mai để tiếp tục nhận thưởng nhé! </b><b><tg-emoji emoji-id=\"6301085965217698432\">🥰</tg-emoji></b>"
+    },
+    "9": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji> <b>Vui lòng thực hiện các bước sau để nhận GIFTCODE:\n\n</b><tg-emoji emoji-id=\"6062023850684584806\">▶️</tg-emoji> <b>Ví dụ: </b><b>/nhancode</b><b> [ Tài Khoản Game] (số tiền rút)\n\n</b><tg-emoji emoji-id=\"5420323339723881652\">⚠️</tg-emoji> <b>Lưu ý: Hệ thống sẽ phát code ngẫu nhiên 8-999K. Chúc bạn win game thắng lớn 🎊</b>"
+    },
+    "10": {
+      "type": "text",
+      "text_html": "<tg-emoji emoji-id=\"5442939099906325301\">🎁</tg-emoji> <b>Mời Bạn Bè Càng Nhiều </b><b><tg-emoji emoji-id=\"5404573776253825754\">🍬</tg-emoji></b><b>\n</b><b><tg-emoji emoji-id=\"5280915586128307520\">🎉</tg-emoji></b><b> Rinh Code Càng Khủng </b><b><tg-emoji emoji-id=\"5280591122823930032\">🎉</tg-emoji></b><b>\n\n</b><b><tg-emoji emoji-id=\"5258269142699489886\">🌈</tg-emoji></b><b> Mã Giftcode Nè</b><b><tg-emoji emoji-id=\"5231102735817918643\">👇</tg-emoji></b><b>:\n👉 {code}\n\n</b><b><tg-emoji emoji-id=\"5215695279377884733\">➡️</tg-emoji></b><b>Link Nhập Code : \n{link game}\n\n</b><b><tg-emoji emoji-id=\"5258040062028822951\">🍀</tg-emoji></b><b> Chúc Bạn Chơi Game Vui Vẻ Thắng Lớn Cùng Bot Game Nhé </b><b><tg-emoji emoji-id=\"5785412486349983037\">👍</tg-emoji></b>"
+    }
+  }
 }

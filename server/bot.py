@@ -43,6 +43,150 @@ bot = telebot.AsyncTeleBot(API_TOKEN)
 pending_states = {}  # {chat_id: {'action': str, ...}}
 _bot_me_cache = None
 
+def extract_message_html(message):
+    text = message.text or message.caption or ''
+    if not text:
+        return ""
+
+    entities = getattr(message, 'entities', None) or getattr(message, 'caption_entities', None)
+    if not entities:
+        return text
+
+    try:
+        encoded = text.encode('utf-16-le')
+        insertions = {}
+
+        for entity in entities:
+            offset = entity.offset
+            length = entity.length
+            etype = entity.type
+            url = getattr(entity, 'url', '')
+
+            start_byte = offset * 2
+            end_byte = (offset + length) * 2
+
+            open_tag = ''
+            close_tag = ''
+
+            if etype == 'bold': open_tag, close_tag = '<b>', '</b>'
+            elif etype == 'italic': open_tag, close_tag = '<i>', '</i>'
+            elif etype == 'code': open_tag, close_tag = '<code>', '</code>'
+            elif etype == 'pre': open_tag, close_tag = '<pre>', '</pre>'
+            elif etype == 'underline': open_tag, close_tag = '<u>', '</u>'
+            elif etype == 'strikethrough': open_tag, close_tag = '<s>', '</s>'
+            elif etype == 'blockquote': open_tag, close_tag = '<blockquote>', '</blockquote>'
+            elif etype == 'text_link': open_tag, close_tag = f'<a href="{url}">', '</a>'
+            elif etype == 'custom_emoji':
+                emoji_id = getattr(entity, 'custom_emoji_id', '')
+                open_tag, close_tag = f'<tg-emoji emoji-id="{emoji_id}">', '</tg-emoji>'
+
+            if open_tag and close_tag:
+                insertions.setdefault(start_byte, []).append(open_tag)
+                insertions.setdefault(end_byte, []).insert(0, close_tag)
+
+        result_bytes = bytearray()
+        for i in range(0, len(encoded), 2):
+            if i in insertions:
+                for tag in insertions[i]:
+                    result_bytes.extend(tag.encode('utf-16-le'))
+            result_bytes.extend(encoded[i:i+2])
+
+        if len(encoded) in insertions:
+            for tag in insertions[len(encoded)]:
+                result_bytes.extend(tag.encode('utf-16-le'))
+
+        return result_bytes.decode('utf-16-le')
+    except Exception as e:
+        logger.error(f"Error parsing message entities to HTML: {e}")
+        return text
+
+def format_preset_vars(html_text, context_vars=None):
+    if not html_text:
+        return html_text
+
+    import re
+    text = html_text
+    ctx = context_vars or {}
+
+    # 1. User Name replacements
+    first_name = ctx.get('first_name')
+    if first_name:
+        text = text.replace('( Tên )', first_name)
+        text = text.replace('(Tên)', first_name)
+        text = text.replace('( Tên)', first_name)
+        text = text.replace('(Tên )', first_name)
+        text = text.replace('{first_name}', first_name)
+        text = text.replace('{name}', first_name)
+
+    # 2. Referral Link & Bot Username replacements
+    ref_link = ctx.get('referral_link')
+    if ref_link:
+        text = text.replace('( Link )', ref_link)
+        text = text.replace('(Link)', ref_link)
+        text = text.replace('( Link)', ref_link)
+        text = text.replace('(Link )', ref_link)
+        text = text.replace('{link}', ref_link)
+        text = text.replace('{referral_link}', ref_link)
+        text = re.sub(r'https://t\.me/[a-zA-Z0-9_]+\?start=ref_\d+', ref_link, text)
+
+    bot_username = ctx.get('bot_username')
+    if bot_username:
+        text = text.replace('@bot', f'@{bot_username}')
+
+    # 3. Dynamic Referral Stats replacements (Preset 3)
+    if 'total' in ctx:
+        total = ctx['total']
+        completed = ctx['completed']
+        pending = ctx['pending']
+        rewards_earned = ctx.get('rewardsEarned', 0)
+
+        text = re.sub(r'(Tổng đã mời:\s*<b>)[^<]*(</b>)', rf'\g<1>{total}\g<2>', text)
+        text = re.sub(r'(Đã tham gia & xác minh:\s*<b>)[^<]*(</b>)', rf'\g<1>{completed}\g<2>', text)
+        text = re.sub(r'(Chờ xác minh:\s*<b>)[^<]*(</b>)', rf'\g<1>{pending}\g<2>', text)
+        text = re.sub(r'(Số Code Đã Được Nhận\s*:\s*<b>)[^<]*(</b>)', rf'\g<1>{rewards_earned}\g<2>', text)
+
+        text = text.replace('{total}', str(total))
+        text = text.replace('{completed}', str(completed))
+        text = text.replace('{pending}', str(pending))
+        text = text.replace('{rewardsEarned}', str(rewards_earned))
+
+    return text
+
+async def send_preset_or_fallback(chat_id, num_key, fallback_text=None, reply_markup=None, context_vars=None):
+    """Send preset message from settings.json with dynamic variables (name, ref link, stats)."""
+    cfg = load_settings()
+    presets = cfg.get('presetMessages', {})
+    preset_data = presets.get(str(num_key))
+
+    if preset_data:
+        saved_html = ""
+        if isinstance(preset_data, dict):
+            saved_html = preset_data.get('text_html') or preset_data.get('html', '')
+        elif isinstance(preset_data, str):
+            saved_html = str(preset_data)
+
+        if saved_html:
+            formatted_html = format_preset_vars(saved_html, context_vars)
+            try:
+                await bot.send_message(chat_id, formatted_html, parse_mode='HTML', reply_markup=reply_markup)
+                return True
+            except Exception as e:
+                logger.warning(f"[PRESET] send_message key={num_key} failed: {e}")
+                try:
+                    await bot.send_message(chat_id, formatted_html, reply_markup=reply_markup)
+                    return True
+                except Exception:
+                    pass
+
+    if fallback_text:
+        formatted_fallback = format_preset_vars(fallback_text, context_vars)
+        try:
+            await bot.send_message(chat_id, formatted_fallback, parse_mode='HTML', reply_markup=reply_markup)
+        except Exception:
+            await bot.send_message(chat_id, formatted_fallback, reply_markup=reply_markup)
+        return True
+    return False
+
 # Synchronous DB helpers
 def get_db():
     conn = sqlite3.connect(DB_FILE)
@@ -254,27 +398,20 @@ async def send_admin_panel(chat_id, message_id=None):
 async def show_join_channels_message(chat_id, unjoined_groups):
     cfg = load_settings()
     join_all_link = cfg.get('joinAllLink', '')
-    custom = cfg.get('customMessages', {})
 
     default_text = (
         "<b>🎁 BẠN CẦN THAM GIA ĐẦY ĐỦ CÁC KÊNH ĐỂ NHẬN CODE MIỄN PHÍ! 🎁</b>\n\n"
         "👉 <i>Vui lòng bấm nút <b>\"🌐 THAM GIA TẤT CẢ NHÓM\"</b> bên dưới để tham gia, sau đó bấm nút <b>\"✅ KIỂM TRA\"</b> để nhận Code nhé 😘</i>"
     )
-    text = custom.get('join', default_text)
 
     markup = types.InlineKeyboardMarkup(row_width=1)
-
-    # Nút duy nhất Link Tổng (Join All)
     url = join_all_link if join_all_link else (f"https://t.me/{unjoined_groups[0].replace('@', '')}" if unjoined_groups else "https://t.me")
     markup.add(types.InlineKeyboardButton("🌐 THAM GIA TẤT CẢ NHÓM", url=url))
-
-    # Nút xác minh KIỂM TRA
     markup.add(types.InlineKeyboardButton("✅ KIỂM TRA", callback_data="verify_subscription"))
 
-    # Send message with Inline Keyboard attached directly underneath
-    await bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=markup)
+    # Preset 5 → tin nhắn yêu cầu tham gia kênh
+    await send_preset_or_fallback(chat_id, '5', default_text, reply_markup=markup)
 
-# Send Welcome Message after verification (Inline Button directly below message)
 async def send_welcome_message(chat_id, user_id, first_name, username):
     global _bot_me_cache
     if not _bot_me_cache:
@@ -282,9 +419,6 @@ async def send_welcome_message(chat_id, user_id, first_name, username):
 
     referral_link = f"https://t.me/{_bot_me_cache.username}?start=ref_{user_id}"
     miniapp_link = "https://t.me/trainghiemtanthu88k_bot/trainghiem88k"
-
-    cfg = load_settings()
-    custom = cfg.get('customMessages', {})
 
     default_welcome = (
         f"👋 <b>Xin chào {first_name}!</b>\n\n"
@@ -294,28 +428,22 @@ async def send_welcome_message(chat_id, user_id, first_name, username):
         f"👇 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> ngay dưới tin nhắn này để bốc code!"
     )
 
-    tpl = custom.get('start')
-    if tpl:
-        try:
-            welcome_text = tpl.format(
-                first_name=first_name,
-                user_id=user_id,
-                referral_link=referral_link,
-                miniapp_link=miniapp_link
-            )
-        except Exception:
-            welcome_text = default_welcome
-    else:
-        welcome_text = default_welcome
-
-    # Inline button directly under the welcome message text
     inline_markup = types.InlineKeyboardMarkup()
     inline_markup.add(types.InlineKeyboardButton("🎁 MỞ MINI APP NHẬN CODE 88K", url=miniapp_link))
 
-    await bot.send_message(chat_id, welcome_text, parse_mode='HTML', reply_markup=inline_markup)
-    
-    # Also attach bottom reply keyboard for other functions (Claims, Referral stats)
-    await bot.send_message(chat_id, "👇 Hoặc chọn các chức năng khác bên dưới:", reply_markup=build_main_menu_keyboard(user_id))
+    ctx = {
+        'first_name': first_name,
+        'user_id': user_id,
+        'referral_link': referral_link,
+        'bot_username': _bot_me_cache.username
+    }
+
+    # Preset 1 → tin nhắn chào mừng /start
+    await send_preset_or_fallback(chat_id, '1', default_welcome, reply_markup=inline_markup, context_vars=ctx)
+
+    # Preset 2 → thay "👇 Hoặc chọn các chức năng khác bên dưới:"
+    default_menu_text = "👇 Hoặc chọn các chức năng khác bên dưới:"
+    await send_preset_or_fallback(chat_id, '2', default_menu_text, reply_markup=build_main_menu_keyboard(user_id), context_vars=ctx)
 
 # Helper: Send milestone referral notification to referrer
 async def send_referral_reward_notification(referrer_id, referred_username):
@@ -464,6 +592,50 @@ async def handle_resetme(message):
         "Bây giờ bạn hãy dùng tài khoản clone (hoặc out khỏi kênh) rồi gõ <code>/start</code> để test lại luồng hiển thị Nút Join Kênh & Nút KIỂM TRA.",
         parse_mode='HTML'
     )
+
+# Command Handler: /set1, /set2 ... /setN or /set 1, /set 2 (Admin set preset pre message)
+@bot.message_handler(regexp=r'^/set\s*(\d+)(?:\s+([\s\S]+))?$')
+async def handle_set_preset(message):
+    user_id = str(message.from_user.id)
+    if not is_admin(user_id):
+        await bot.send_message(message.chat.id, "⛔ Bạn không có quyền Admin!")
+        return
+
+    import re
+    match = re.match(r'^/set\s*(\d+)(?:\s+([\s\S]+))?$', message.text.strip())
+    if not match:
+        return
+
+    num_key = match.group(1)
+    content = match.group(2)
+
+    if content:
+        cfg = load_settings()
+        presets = cfg.get('presetMessages', {})
+        presets[num_key] = {
+            'type': 'text',
+            'text_html': content.strip(),
+            'html': content.strip(),
+            'chat_id': message.chat.id,
+            'message_id': message.message_id
+        }
+        cfg['presetMessages'] = presets
+        save_settings(cfg)
+
+        await bot.send_message(
+            message.chat.id,
+            f"✅ <b>ĐÃ LƯU TIN NHẮN MẪU SỐ {num_key}!</b>",
+            parse_mode='HTML'
+        )
+    else:
+        pending_states[message.chat.id] = {'action': 'set_preset_msg', 'key': num_key}
+        markup = types.InlineKeyboardMarkup([[types.InlineKeyboardButton("❌ Hủy", callback_data="admin_home")]])
+        await bot.send_message(
+            message.chat.id,
+            f"📝 <b>[SET {num_key}]</b> Hãy gửi tin nhắn bạn muốn lưu làm mẫu tin nhắn pre số <b>{num_key}</b>:",
+            parse_mode='HTML',
+            reply_markup=markup
+        )
 
 # Command Handler: /admin
 @bot.message_handler(commands=['admin'])
@@ -709,13 +881,13 @@ async def handle_messages(message):
         total_claims = c.fetchone()['used']
         conn.close()
 
-        reply = (
+        fallback_reply = (
             f"⚙️ <b>THỐNG KÊ KHO GIFCODE (QUẢN TRỊ VIÊN)</b>\n\n"
             f"🟢 <b>Mã Code khả dụng trong kho:</b> <b>{avail_codes}</b> / {total_codes} code\n"
             f"🎁 <b>Tổng số lượt đã bốc thành công:</b> <b>{total_claims}</b> lượt\n\n"
             f"👇 <i>Dùng Bảng Quản Trị để nạp thêm code khi cần!</i>"
         )
-        await bot.send_message(chat_id, reply, parse_mode='HTML')
+        await send_preset_or_fallback(chat_id, '5', fallback_reply)
         return
 
     # Reply Button: "📋 Code đã nhận"
@@ -727,10 +899,13 @@ async def handle_messages(message):
         conn.close()
 
         if not claims:
-            await bot.send_message(chat_id, "Bạn chưa nhận code nào. Hãy mở Mini App bốc code ngay!")
+            # Preset 4 for empty Code đã nhận
+            default_empty = "‼️ <b><i>Bạn chưa nhận code nào cả. Hãy mở MiniApp làm nhiệm vụ xem video nhận code ngay nào 🎉</i></b>"
+            await send_preset_or_fallback(chat_id, '4', default_empty)
         else:
             reply = "🎁 <b>DANH SÁCH CODE ĐÃ NHẬN:</b>\n\n"
             for idx, item in enumerate(claims, 1):
+                claimed_time = item['claimed_at'] if 'claimed_at' in item.keys() else ''
                 reply += f"{idx}. <b>{item['category_name'] or 'Tân Thủ'}</b>: <code>{item['code']}</code>\n"
             await bot.send_message(chat_id, reply, parse_mode='HTML')
         return
@@ -741,19 +916,30 @@ async def handle_messages(message):
         if not _bot_me_cache:
             _bot_me_cache = await bot.get_me()
 
+        first_name = message.from_user.first_name or 'Bạn'
         stats = get_referral_stats_db(user_id)
         ref_link = f"https://t.me/{_bot_me_cache.username}?start=ref_{user_id}"
 
-        reply = (
-            f"👥 <b>THỐNG KÊ MỜI BẠN BÈ</b>\n\n"
-            f"🔗 Link mời của bạn:\n<code>{ref_link}</code>\n\n"
-            f"📊 Tổng đã mời: <b>{stats['total']}</b> người\n"
+        fallback_reply = (
+            f"📊 <b>THỐNG KÊ MỜI BẠN BÈ</b>\n\n"
+            f"✅ <b>Link Mời bạn bè:</b>\n<code>{ref_link}</code>\n\n"
+            f"👉 Tổng đã mời: <b>{stats['total']}</b> người\n"
             f"✅ Đã tham gia & xác minh: <b>{stats['completed']}</b> người\n"
             f"⏳ Chờ xác minh: <b>{stats['pending']}</b> người\n\n"
-            f"🎁 Cần mời đủ <b>{stats['rewardCount']}</b> người → nhận 1 Code thưởng\n"
-            f"🏆 Số Code thưởng đã nhận: <b>{stats['rewardsEarned']}</b>"
+            f"🎁 Số Code Đã Được Nhận: <b>{stats['rewardsEarned']}</b>"
         )
-        await bot.send_message(chat_id, reply, parse_mode='HTML')
+        ctx = {
+            'first_name': first_name,
+            'user_id': user_id,
+            'referral_link': ref_link,
+            'bot_username': _bot_me_cache.username,
+            'total': stats['total'],
+            'completed': stats['completed'],
+            'pending': stats['pending'],
+            'rewardsEarned': stats['rewardsEarned']
+        }
+        # Preset 3 for Thống kê mời bạn!
+        await send_preset_or_fallback(chat_id, '3', fallback_reply, context_vars=ctx)
         return
 
     # Reply Button: "⚙️ BẢNG ĐIỀU KHIỂN ADMIN"
@@ -771,6 +957,28 @@ async def handle_messages(message):
     if chat_id in pending_states and is_admin(user_id):
         pending = pending_states.pop(chat_id)
         action = pending.get('action')
+
+        if action == 'set_preset_msg':
+            num_key = pending.get('key', '1')
+            html_content = extract_message_html(message)
+            cfg = load_settings()
+            presets = cfg.get('presetMessages', {})
+            presets[num_key] = {
+                'type': 'text',
+                'text_html': html_content,
+                'html': html_content,
+                'chat_id': message.chat.id,
+                'message_id': message.message_id
+            }
+            cfg['presetMessages'] = presets
+            save_settings(cfg)
+
+            await bot.send_message(
+                chat_id,
+                f"✅ <b>ĐÃ LƯU TIN NHẮN MẪU SỐ {num_key}!</b>\n\nBấm nút hoặc gõ <b>{num_key}</b> để phát lại tin nhắn này bất kỳ lúc nào.",
+                parse_mode='HTML'
+            )
+            return
 
         if action == 'edit_custom_msg':
             msg_type = pending.get('msg_type')

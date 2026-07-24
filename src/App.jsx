@@ -303,8 +303,8 @@ export default function App() {
       console.warn('Error recording ad step completion:', e);
     }
 
-    if (videoStep < 5) {
-      // Completed Video 1/5, 2/5, 3/5, 4/5 → start 15s inter-ad rest
+    if (videoStep < 3) {
+      // Completed Video 1/3, 2/3 → start 15s inter-ad rest
       const nextStep = videoStep + 1;
       setShowAdModal(false);
       soundFx.playTap();
@@ -315,7 +315,7 @@ export default function App() {
         localStorage.setItem(`videoStep_${userId}`, String(nextStep));
       }
     } else {
-      // Completed Video 5/5 (Final step to claim code)
+      // Completed Video 3/3 (Final step to claim code)
       try {
         const username = tgUser ? (tgUser.first_name || tgUser.username) : 'Khách May Mắn';
 
@@ -420,7 +420,7 @@ export default function App() {
             </>
           )}
           <span className="announcement-item">
-            Quy định: Xem đủ 5 Video quảng cáo để nhận 1 Code (1 Ngày nhận 1 lần)
+            Quy định: Xem đủ 3 Video quảng cáo Adsgram để nhận 1 Code (1 Ngày nhận 1 lần)
           </span>
         </div>
       </div>
@@ -466,22 +466,20 @@ export default function App() {
             <h2 className="hero-display-title">NHẬN GIFCODE TRẢI NGHIỆM</h2>
             
             <p className="hero-description-text">
-              Xem đủ 5 video quảng cáo để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
+              Xem đủ 3 video quảng cáo Adsgram để bốc ngay 1 Gifcode độc quyền! (Giới hạn 1 lượt / 24h).
             </p>
 
-            {/* 5-Video Step Progress Tracker */}
+            {/* 3-Video Step Progress Tracker */}
             {cooldownMs <= 0 && (
               <div className="video-step-progress-wrapper">
                 <div className="step-tracker-header">
                   <span>TIẾN TRÌNH XEM VIDEO</span>
-                  <span>BƯỚC {videoStep}/5</span>
+                  <span>BƯỚC {videoStep}/3</span>
                 </div>
                 <div className="step-dots-row">
                   <div className={`step-dot-item ${videoStep > 1 ? 'completed' : videoStep === 1 ? 'active' : ''}`} />
                   <div className={`step-dot-item ${videoStep > 2 ? 'completed' : videoStep === 2 ? 'active' : ''}`} />
-                  <div className={`step-dot-item ${videoStep > 3 ? 'completed' : videoStep === 3 ? 'active' : ''}`} />
-                  <div className={`step-dot-item ${videoStep > 4 ? 'completed' : videoStep === 4 ? 'active' : ''}`} />
-                  <div className={`step-dot-item ${videoStep === 5 ? 'active' : ''}`} />
+                  <div className={`step-dot-item ${videoStep === 3 ? 'active' : ''}`} />
                 </div>
               </div>
             )}
@@ -505,10 +503,10 @@ export default function App() {
               <div className="cooldown-active-card" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
                 <div style={{ fontSize: '36px', marginBottom: '4px' }}>⏳</div>
                 <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent-amber-light)', marginBottom: '6px' }}>
-                  NGHỈ NGƠI TRƯỚC VIDEO {videoStep}/5
+                  NGHỈ NGƠI TRƯỚC VIDEO {videoStep}/3
                 </h3>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', maxWidth: '85%', margin: '0 auto 10px' }}>
-                  Video {videoStep - 1}/5 xem xong! Chờ {interAdCooldown}s để xem tiếp video {videoStep}/5.
+                  Video {videoStep - 1}/3 xem xong! Chờ {interAdCooldown}s để xem tiếp video {videoStep}/3.
                 </p>
                 <div className="countdown-timer-display" style={{ fontSize: '28px' }}>
                   {String(interAdCooldown).padStart(2, '0')}s
@@ -525,7 +523,7 @@ export default function App() {
                   <Video size={22} color="#000" />
                   <span>
                     {isAdLoading && 'Đang tải quảng cáo...'}
-                    {!isAdLoading && `XEM VIDEO ${videoStep}/5`}
+                    {!isAdLoading && `XEM VIDEO ${videoStep}/3`}
                   </span>
                 </button>
               </div>

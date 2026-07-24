@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, AlertCircle, X, Volume2, CheckCircle2 } from 'lucide-react';
 import { soundFx } from '../utils/sound';
 
-export default function AdPlayerModal({ category, targetDuration = 15, currentStep = 1, totalSteps = 5, onAdComplete, onClose }) {
+export default function AdPlayerModal({ category, targetDuration = 15, currentStep = 1, totalSteps = 3, onAdComplete, onClose }) {
   const [timeLeft, setTimeLeft] = useState(targetDuration);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
