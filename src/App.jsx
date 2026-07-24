@@ -236,6 +236,18 @@ export default function App() {
       console.warn('IP/Fingerprint check note:', e);
     }
 
+    // 0.1 Check Telegram PC / Desktop Platform (Adsgram video ads require Telegram Mobile App on iOS/Android)
+    const platform = (window.Telegram?.WebApp?.platform || '').toLowerCase();
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isDesktop = ['tdesktop', 'macdesktop', 'weba', 'webk', 'web'].includes(platform) && !isMobileUA;
+
+    if (isDesktop) {
+      setIsAdLoading(false);
+      triggerHaptic('warning');
+      alert('⚠️ Quảng cáo Video Adsgram chỉ hỗ trợ xem trên Điện Thoại (Ứng dụng Telegram trên iOS hoặc Android).\n\nVui lòng mở Mini App từ điện thoại di động để cày code nhận thưởng nhé!');
+      return;
+    }
+
     // 1. Try real ad SDK (Adsgram / Monetag)
     const adResult = await playRewardedAd(videoStep, userId);
     setIsAdLoading(false);
@@ -244,14 +256,17 @@ export default function App() {
       // Real ad SDK resolved successfully
       await handleAdStepComplete();
     } else {
-      // If Adsgram was skipped or closed early by the user
-      if (adResult.provider === 'adsgram' && adResult.error && adResult.error !== 'SDK_NOT_LOADED') {
-        triggerHaptic('warning');
-        alert('Vui lòng xem hết video quảng cáo để tích điểm bốc Gifcode!');
-        return;
+      triggerHaptic('warning');
+      if (adResult.provider === 'adsgram') {
+        const errorMsg = typeof adResult.error === 'string' ? adResult.error : (adResult.error?.description || adResult.error?.message || '');
+        if (errorMsg.toLowerCase().includes('desktop') || errorMsg.toLowerCase().includes('platform')) {
+          alert('⚠️ Quảng cáo Video Adsgram chỉ hỗ trợ xem trên Điện Thoại (App Telegram iOS/Android).\n\nVui lòng dùng điện thoại mở Bot để xem quảng cáo tích điểm!');
+        } else {
+          alert('⚠️ Vui lòng xem hết video quảng cáo Adsgram để tích điểm bốc Gifcode!');
+        }
+      } else {
+        alert('⚠️ Quảng cáo chưa sẵn sàng hoặc bị hủy. Vui lòng thử lại!');
       }
-      // Fallback to built-in video player modal if SDK not active/available in environment
-      setShowAdModal(true);
     }
   };
 

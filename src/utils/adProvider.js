@@ -10,10 +10,12 @@
 export const ADSGRAM_BLOCKS = ['39426', '39427'];
 
 export async function playRewardedAd(stepIndex = 1, userId = null) {
-  // Extract Telegram User ID for Adsgram reward tracking & payout attribution
-  let tgUserId = userId;
-  if ((!tgUserId || tgUserId === 'user-web') && typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+  // Always prioritize real Telegram numeric user ID from WebApp SDK
+  let tgUserId = null;
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
     tgUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  } else if (userId && userId !== 'user-web' && userId !== 'user-anon') {
+    tgUserId = String(userId);
   }
 
   // Steps 1, 2, 3: Adsgram Network (numeric blockId + userId)
@@ -22,17 +24,17 @@ export async function playRewardedAd(stepIndex = 1, userId = null) {
 
     if (typeof window !== 'undefined' && window.Adsgram) {
       try {
-        console.log(`🎬 [Adsgram] Launching blockId "${blockId}" for Telegram userId: "${tgUserId}" (Step ${stepIndex}/5)...`);
-        
         const initParams = {
           blockId: String(blockId),
           debug: false
         };
 
-        // CRITICAL: userId is required by Adsgram to credit earnings to publisher account!
+        // Pass Telegram User ID to Adsgram for revenue attribution
         if (tgUserId) {
           initParams.userId = String(tgUserId);
         }
+
+        console.log(`🎬 [Adsgram] Calling window.Adsgram.init with params:`, JSON.stringify(initParams));
 
         const AdController = window.Adsgram.init(initParams);
         const result = await AdController.show();
