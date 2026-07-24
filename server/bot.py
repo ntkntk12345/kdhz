@@ -31,7 +31,7 @@ def load_settings():
 def save_settings(data):
     try:
         with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-            json.dumps(data, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving settings.json: {e}")
 
@@ -43,7 +43,7 @@ bot = telebot.AsyncTeleBot(API_TOKEN)
 pending_states = {}  # {chat_id: {'action': str, ...}}
 _bot_me_cache = None
 
-# Synchronous DB helpers for fast operations
+# Synchronous DB helpers
 def get_db():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
@@ -53,6 +53,11 @@ def init_sqlite_tables():
     conn = get_db()
     cursor = conn.cursor()
     cursor.executescript('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id TEXT PRIMARY KEY,
+            checked INTEGER DEFAULT 0,
+            registration_date REAL
+        );
         CREATE TABLE IF NOT EXISTS subscribed_users (
             user_id TEXT PRIMARY KEY,
             verified_at TEXT NOT NULL
@@ -83,8 +88,7 @@ def add_admin(user_id):
     if str(user_id) not in admins:
         admins.append(str(user_id))
         cfg['adminTelegramIds'] = admins
-        with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        save_settings(cfg)
 
 def is_user_verified_db(user_id):
     conn = get_db()
@@ -99,10 +103,12 @@ def mark_user_verified_db(user_id):
     c = conn.cursor()
     now = datetime.now(VIETNAM_TZ).isoformat()
     c.execute('INSERT OR REPLACE INTO subscribed_users (user_id, verified_at) VALUES (?, ?)', (str(user_id), now))
+    c.execute('INSERT OR IGNORE INTO users (user_id, checked, registration_date) VALUES (?, 1, ?)', (str(user_id), datetime.now(VIETNAM_TZ).timestamp()))
+    c.execute('UPDATE users SET checked = 1 WHERE user_id = ?', (str(user_id),))
     conn.commit()
     conn.close()
 
-# Record referral (mb66 logic)
+# Record referral (mb66.py logic)
 def record_referral_db(referrer_id, referred_id, referred_username):
     if str(referrer_id) == str(referred_id):
         return
@@ -121,7 +127,7 @@ def record_referral_db(referrer_id, referred_id, referred_username):
     conn.commit()
     conn.close()
 
-# Complete referral & return referrer_id if newly completed
+# Complete referral immediately when referred user verifies channels on bot
 def complete_referral_db(referred_id):
     conn = get_db()
     c = conn.cursor()
@@ -187,7 +193,7 @@ def build_main_menu_keyboard(user_id):
     web_app_btn = types.KeyboardButton(text='🎁 MỞ MINI APP NHẬN CODE 88K', web_app=types.WebAppInfo(url=raw_webapp_url))
     markup.row(web_app_btn)
 
-    # Row 2: Join All Groups
+    # Row 2: Join All Groups (if link set)
     if join_all_link:
         markup.row(types.KeyboardButton(text='📢 THAM GIA TẤT CẢ NHÓM'))
 
@@ -250,35 +256,29 @@ async def send_admin_panel(chat_id, message_id=None):
     else:
         await bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=build_admin_keyboard())
 
-# Gate Message for missing channel subscriptions (exact mb66 style)
-async def send_membership_gate_message(chat_id, missing_groups):
+# Gate Message for missing channel subscriptions (EXACT mb66.py inline button style)
+async def show_join_channels_message(chat_id, unjoined_groups):
     cfg = load_settings()
     join_all_link = cfg.get('joinAllLink', '')
 
     text = (
-        "‼️ <b>VUI LÒNG THAM GIA ĐẦY ĐỦ CÁC KÊNH / NHÓM BẮT BUỘC</b> ‼️\n\n"
-        "Để mở khóa Mini App & Nhận Gifcode 88K, bạn cần tham gia đầy đủ các kênh bên dưới:\n\n"
+        "<b>🎁 BẠN CẦN THAM GIA ĐẦY ĐỦ CÁC KÊNH ĐỂ NHẬN CODE MIỄN PHÍ! 🎁</b>\n\n"
+        "👉 <i>Vui lòng bấm nút <b>\"🌐 THAM GIA TẤT CẢ NHÓM\"</b> bên dưới để tham gia, sau đó bấm nút <b>\"✅ KIỂM TRA\"</b> để nhận Code nhé 😘</i>"
     )
 
-    for idx, grp in enumerate(missing_groups, 1):
-        text += f"{idx}. <b>{grp}</b>\n"
+    markup = types.InlineKeyboardMarkup(row_width=1)
 
-    text += "\n👇 <i>Bấm từng nút kênh bên dưới để tham gia và bấm \"Xác Minh Ngay\":</i>"
+    # Nút duy nhất Link Tổng (Join All)
+    url = join_all_link if join_all_link else (f"https://t.me/{unjoined_groups[0].replace('@', '')}" if unjoined_groups else "https://t.me")
+    markup.add(types.InlineKeyboardButton("🌐 THAM GIA TẤT CẢ NHÓM", url=url))
 
-    markup = types.InlineKeyboardMarkup()
-    for idx, grp in enumerate(missing_groups, 1):
-        clean_name = grp.replace('@', '')
-        url = grp if grp.startswith('http') else f"https://t.me/{clean_name}"
-        markup.add(types.InlineKeyboardButton(f"📢 KÊNH {idx}: {grp}", url=url))
+    # Nút xác minh KIỂM TRA
+    markup.add(types.InlineKeyboardButton("✅ KIỂM TRA", callback_data="verify_subscription"))
 
-    if join_all_link:
-        markup.add(types.InlineKeyboardButton("🌐 THAM GIA TẤT CẢ NHÓM (LINK TỔNG)", url=join_all_link))
-
-    markup.add(types.InlineKeyboardButton("🔄 ĐÃ THAM GIA - XÁC MINH NGAY", callback_data="check_membership_again"))
-
+    # Send message with Inline Keyboard attached directly underneath
     await bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=markup)
 
-# Send Welcome Message after verification
+# Send Welcome Message after verification (Show Reply Keyboard ONLY NOW)
 async def send_welcome_message(chat_id, user_id, first_name, username):
     global _bot_me_cache
     if not _bot_me_cache:
@@ -289,12 +289,45 @@ async def send_welcome_message(chat_id, user_id, first_name, username):
     welcome_text = (
         f"👋 <b>Xin chào {first_name}!</b>\n\n"
         f"🎁 <b>NHẬN CODE TRẢI NGHIỆM MIỄN PHÍ 88K</b> 🎁\n\n"
-        f"👥 <b>Mời bạn bè:</b> Mời 3 người bạn tham gia & xem video → nhận thêm 1 Code miễn phí!\n"
+        f"👥 <b>Mời bạn bè:</b> Mời 3 người bạn tham gia & xác minh → nhận thêm 1 Code miễn phí!\n"
         f"🔗 Link mời của bạn:\n<code>{referral_link}</code>\n\n"
-        f"👇 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để nhận code ngay!"
+        f"👇 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để bốc code ngay!"
     )
 
+    # Show the main reply keyboard under chat input ONLY AFTER full verification!
     await bot.send_message(chat_id, welcome_text, parse_mode='HTML', reply_markup=build_main_menu_keyboard(user_id))
+
+# Helper: Send milestone referral notification to referrer
+async def send_referral_reward_notification(referrer_id, referred_username):
+    if not referrer_id:
+        return
+    try:
+        stats = get_referral_stats_db(referrer_id)
+        completed = stats['completed']
+        reward_count = stats['rewardCount']
+        
+        display_user = f"@{referred_username}" if referred_username and not referred_username.startswith('@') else (referred_username or 'Thành viên mới')
+
+        # Check if reaching a milestone (multiple of reward_count, e.g. 3, 6, 9...)
+        if completed > 0 and completed % reward_count == 0:
+            ref_msg = (
+                f"🎉 <b>CHÚC MỪNG BẠN ĐÃ MỜI THÀNH CÔNG ĐỦ {completed} BẠN!</b> 🎁\n\n"
+                f"Bạn vừa mời thành công bạn <b>{display_user}</b> và đạt mốc <b>{completed} người</b> (Đủ mốc {reward_count} người)!\n\n"
+                f"🎁 <b>Bạn nhận được 1 lượt Gifcode thưởng đặc biệt!</b>\n"
+                f"👉 Bấm nút <b>\"🎁 MỞ MINI APP NHẬN CODE 88K\"</b> bên dưới để bốc thưởng ngay!"
+            )
+        else:
+            current_in_step = completed % reward_count
+            remaining = reward_count - current_in_step
+            ref_msg = (
+                f"🎉 <b>Chúc mừng bạn đã mời thành công bạn {display_user} tham gia bot!</b> ❤️\n\n"
+                f"📊 Tiến trình: <b>{current_in_step}/{reward_count}</b> người (Tổng đã mời: <b>{completed}</b> người).\n"
+                f"🎁 Mời thêm <b>{remaining} người</b> nữa để nhận ngay 1 Gifcode thưởng!"
+            )
+
+        await bot.send_message(int(referrer_id), ref_msg, parse_mode='HTML')
+    except Exception as e:
+        logger.warning(f"Failed to send referral notification to {referrer_id}: {e}")
 
 # Command Handler: /start
 @bot.message_handler(commands=['start'])
@@ -308,34 +341,46 @@ async def handle_start(message):
     if user_id == '5301275536':
         add_admin(user_id)
 
-    # Process referral param: /start ref_123456
+    # Parse referral param: /start ref_123456 or /start 123456 (mb66.py format)
     text_args = message.text.split()
     if len(text_args) > 1:
         param = text_args[1].strip()
-        if param.startswith('ref_'):
-            referrer_id = param.replace('ref_', '')
-            if referrer_id and referrer_id != user_id:
-                record_referral_db(referrer_id, user_id, username)
-                logger.info(f"🔗 [Referral] User {user_id} joined via referral from {referrer_id}")
+        ref_id = param.replace('ref_', '')
+        if ref_id.isdigit() and ref_id != user_id:
+            record_referral_db(ref_id, user_id, username)
+            logger.info(f"🔗 [Referral] User {user_id} (@{username}) recorded under referrer {ref_id}")
 
-    # 1. BOT VERIFIES CHANNEL MEMBERSHIP (bot.get_chat_member)
-    is_sub, missing = await check_user_membership(user_id)
+    # 1. CHECK CHANNEL MEMBERSHIP FIRST VIA TELEGRAM BOT API (get_chat_member)
+    is_sub, unjoined = await check_user_membership(user_id)
+
     if not is_sub:
-        await send_membership_gate_message(chat_id, missing)
+        # User hasn't joined all required channels -> Show Inline Buttons directly under start message
+        await show_join_channels_message(chat_id, unjoined)
         return
 
-    # 2. MARK USER VERIFIED & COMPLETE REFERRAL IF APPLICABLE
+    # 2. USER HAS JOINED ALL CHANNELS -> MARK VERIFIED IN DB
     mark_user_verified_db(user_id)
-    referrer_id = complete_referral_db(user_id)
-    if referrer_id:
-        try:
-            # Send notification to referrer (like mb66.py line 510)
-            ref_msg = f"🌈 <b>Bạn vừa nhận được thưởng khi mời {username} tham gia bot thành công!</b> ❤️"
-            await bot.send_message(int(referrer_id), ref_msg, parse_mode='HTML')
-        except Exception as e:
-            logger.warning(f"Failed to send referral reward notification to {referrer_id}: {e}")
 
+    # Show Welcome Message WITH Main Reply Keyboard
     await send_welcome_message(chat_id, user_id, first_name, username)
+
+# Command Handler: /resetme (Dành cho Admin reset trạng thái test luồng xác minh)
+@bot.message_handler(commands=['resetme'])
+async def handle_resetme(message):
+    user_id = str(message.from_user.id)
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('DELETE FROM subscribed_users WHERE user_id = ?', (user_id,))
+    c.execute('UPDATE users SET checked = 0 WHERE user_id = ?', (user_id,))
+    c.execute('DELETE FROM referrals WHERE referred_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    await bot.send_message(
+        message.chat.id,
+        "🔄 <b>Đã xóa trạng thái xác minh test của bạn!</b>\n\n"
+        "Bây giờ bạn hãy dùng tài khoản clone (hoặc out khỏi kênh <code>@khaicutr</code>) rồi gõ <code>/start</code> để test lại luồng hiển thị Nút Join Kênh & Nút KIỂM TRA.",
+        parse_mode='HTML'
+    )
 
 # Command Handler: /admin
 @bot.message_handler(commands=['admin'])
@@ -355,7 +400,7 @@ async def handle_admin(message):
     else:
         await bot.send_message(chat_id, "❌ <b>Sai mật khẩu Admin!</b> Cú pháp: <code>/admin [mat_khau]</code>", parse_mode='HTML')
 
-# Callback Query Listener
+# Callback Query Listener (Inline Button Click)
 @bot.callback_query_handler(func=lambda call: True)
 async def handle_callback_query(call):
     chat_id = call.message.chat.id
@@ -365,25 +410,25 @@ async def handle_callback_query(call):
     username = call.from_user.username or first_name
     data = call.data
 
-    # Re-verify Channel Membership
-    if data == 'check_membership_again':
-        is_sub, missing = await check_user_membership(user_id)
+    # Inline Check Button Click: "✅ KIỂM TRA" (verify_subscription)
+    if data == 'verify_subscription':
+        is_sub, unjoined = await check_user_membership(user_id)
         if not is_sub:
-            await bot.answer_callback_query(call.id, text=f"❌ Bạn chưa tham gia đủ {len(missing)} nhóm! Vui lòng tham gia rồi thử lại.", show_alert=True)
+            await bot.answer_callback_query(
+                call.id,
+                text=f"❌ Bạn chưa tham gia đủ {len(unjoined)} kênh bắt buộc! Vui lòng tham gia rồi bấm lại KIỂM TRA.",
+                show_alert=True
+            )
         else:
             await bot.answer_callback_query(call.id, text="✅ Xác minh thành công!")
             mark_user_verified_db(user_id)
-            referrer_id = complete_referral_db(user_id)
-            if referrer_id:
-                try:
-                    ref_msg = f"🌈 <b>Bạn vừa nhận được thưởng khi mời {username} tham gia bot thành công!</b> ❤️"
-                    await bot.send_message(int(referrer_id), ref_msg, parse_mode='HTML')
-                except Exception:
-                    pass
+
             try:
                 await bot.delete_message(chat_id, message_id)
             except Exception:
                 pass
+
+            # NOW SHOW WELCOME MESSAGE + BOT REPLY KEYBOARD
             await send_welcome_message(chat_id, user_id, first_name, username)
         return
 

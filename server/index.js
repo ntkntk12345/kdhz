@@ -85,18 +85,65 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
+// Helper: Send Telegram Referral Notification from server
+async function sendReferralNotification(referrerId, referredUsername) {
+  try {
+    const settings = db.getSettings();
+    const botToken = settings.botToken;
+    const stats = await db.getReferralStats(referrerId);
+    const completed = stats.completed;
+    const rewardCount = stats.rewardCount || 3;
+    const displayUser = referredUsername ? (referredUsername.startsWith('@') ? referredUsername : `@${referredUsername}`) : 'Bạn mới';
+
+    let text = '';
+    if (completed > 0 && completed % rewardCount === 0) {
+      text = `🎉 <b>CHÚC MỪNG BẠN ĐÃ MỜI THÀNH CÔNG ĐỦ ${completed} BẠN!</b> 🎁\n\n` +
+             `Bạn vừa mời thành công bạn <b>${displayUser}</b> xem video & bốc Gifcode thành công (Đạt mốc ${rewardCount} người)!\n\n` +
+             `🎁 <b>Bạn nhận được 1 lượt Gifcode thưởng đặc biệt!</b>\n` +
+             `👉 Bấm nút <b>"🎁 MỞ MINI APP NHẬN CODE 88K"</b> trên Bot để bốc thưởng ngay!`;
+    } else {
+      const currentInStep = completed % rewardCount;
+      const remaining = rewardCount - currentInStep;
+      text = `🎉 <b>Chúc mừng bạn! Người bạn ${displayUser} vừa xem đủ video & bốc Gifcode thành công!</b> ❤️\n\n` +
+             `📊 Tiến trình: <b>${currentInStep}/${rewardCount}</b> người (Tổng đã bốc code: <b>${completed}</b> người).\n` +
+             `🎁 Mời thêm <b>${remaining} người</b> nữa để nhận ngay 1 Gifcode thưởng!`;
+    }
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: referrerId,
+        text,
+        parse_mode: 'HTML'
+      })
+    });
+  } catch (e) {
+    console.warn('Error sending referral notification from server:', e.message);
+  }
+}
+
 // 2. Claim Gifcode after watching 5 Ads
 app.post('/api/ads/claim', async (req, res) => {
   try {
     const { categoryId, userId, username } = req.body;
+    const ip = getClientIp(req);
 
     if (!categoryId) {
       return res.status(400).json({ success: false, message: 'Vui lòng chọn danh mục!' });
     }
 
-    const result = await db.claimRandomCode(categoryId, userId, username);
+    const result = await db.claimRandomCode(categoryId, userId, username, ip);
     if (!result.success) {
       return res.status(400).json(result);
+    }
+
+    // Check if user was referred & complete referral notification when code is claimed
+    if (userId && userId !== 'user-anon' && userId !== 'user-web') {
+      const completedRef = await db.markReferralCompleted(userId);
+      if (completedRef && completedRef.referrerId) {
+        sendReferralNotification(completedRef.referrerId, completedRef.referredUsername || username);
+      }
     }
 
     res.json(result);
@@ -329,13 +376,6 @@ app.delete('/api/admin/categories/:id', requireAdminToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// ─── SERVE ADMIN PANEL ────────────────────────────────────────────────────────
-const adminPath = path.join(__dirname, '../public/admin');
-app.use('/admin', express.static(adminPath));
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(adminPath, 'index.html'));
 });
 
 // ─── SERVE PRODUCTION SPA ─────────────────────────────────────────────────────

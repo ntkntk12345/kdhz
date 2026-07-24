@@ -31,9 +31,7 @@ export default function AdPlayerModal({ category, targetDuration = 15, currentSt
     setIsClaiming(false);
   };
 
-  const providerLabel = currentStep <= 3 
-    ? `Adsgram Ad #${currentStep} (${currentStep === 2 ? 'int-39407' : 'int-39406'})` 
-    : `Monetag Ad #${currentStep} (${currentStep === 4 ? 'Rewarded Pop' : 'In-App Interstitial'})`;
+  const providerLabel = `Video Quảng Cáo #${currentStep}`;
 
   return (
     <div className="crafted-modal-backdrop">

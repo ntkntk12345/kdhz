@@ -247,7 +247,7 @@ export default function App() {
       // If Adsgram was skipped or closed early by the user
       if (adResult.provider === 'adsgram' && adResult.error && adResult.error !== 'SDK_NOT_LOADED') {
         triggerHaptic('warning');
-        alert('Vui lòng xem hết quảng cáo Adsgram để nhận tính điểm và bốc Gifcode!');
+        alert('Vui lòng xem hết video quảng cáo để tích điểm bốc Gifcode!');
         return;
       }
       // Fallback to built-in video player modal if SDK not active/available in environment

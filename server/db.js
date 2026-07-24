@@ -357,8 +357,43 @@ export const db = {
     return { canClaim: true, remainingMs: 0, lastClaimedAt: latest.claimed_at };
   },
 
-  claimRandomCode: async (categoryId, userId, username) => {
-    // 1. Validate 24h cooldown
+  checkIpClaimLimit: async (ip, userId) => {
+    if (!ip || ip === 'unknown' || ip === '127.0.0.1') {
+      return { canClaim: true };
+    }
+
+    const now = Date.now();
+    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
+
+    // Check if ANY other user account claimed a code from this IP in last 24h
+    const recentClaim = await dbGet(
+      'SELECT * FROM claims WHERE ip_address = ? AND user_id != ? ORDER BY claimed_at DESC LIMIT 1',
+      [ip, String(userId)]
+    );
+
+    if (recentClaim) {
+      const lastTime = new Date(recentClaim.claimed_at).getTime();
+      const elapsed = now - lastTime;
+
+      if (elapsed < cooldownMs) {
+        const remainingMs = cooldownMs - elapsed;
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        return {
+          canClaim: false,
+          reason: 'ip_duplicate',
+          message: `⚠️ Địa chỉ IP của bạn (${ip}) đã được tài khoản khác sử dụng để bốc Code hôm nay! (Giới hạn: 1 IP chỉ được bốc 1 Code / 24h). Vui lòng thử lại sau ${hours}h ${minutes}m.`,
+          remainingMs
+        };
+      }
+    }
+
+    return { canClaim: true };
+  },
+
+  claimRandomCode: async (categoryId, userId, username, ip = 'unknown') => {
+    // 1. Validate 24h user cooldown
     if (userId && userId !== 'user-web') {
       const cooldown = await db.getUserCooldown(userId);
       if (!cooldown.canClaim) {
@@ -374,7 +409,19 @@ export const db = {
       }
     }
 
-    // 2. Find available unused code from SQLite
+    // 2. Strict 1 IP / 1 Code limit
+    if (ip && ip !== 'unknown') {
+      const ipCheck = await db.checkIpClaimLimit(ip, userId);
+      if (!ipCheck.canClaim) {
+        return {
+          success: false,
+          message: ipCheck.message,
+          remainingMs: ipCheck.remainingMs
+        };
+      }
+    }
+
+    // 3. Find available unused code from SQLite
     const availableCodes = await dbAll('SELECT * FROM gifcodes WHERE category_id = ? AND is_used = 0', [categoryId]);
     if (!availableCodes || availableCodes.length === 0) {
       return { success: false, message: 'Đã hết Gifcode cho mục này! Vui lòng quay lại sau.' };
@@ -392,11 +439,11 @@ export const db = {
     const category = await dbGet('SELECT * FROM categories WHERE id = ?', [categoryId]);
     const categoryName = category ? category.name : 'Tân Thủ';
 
-    // Record claim in SQLite
+    // Record claim in SQLite with IP address
     const claimId = `claim-${Date.now()}`;
     await dbRun(
-      'INSERT INTO claims (id, user_id, username, category_id, category_name, code, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [claimId, userId || 'user-anon', username || 'Khách may mắn', categoryId, categoryName, selected.code, now]
+      'INSERT INTO claims (id, user_id, username, category_id, category_name, code, ip_address, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [claimId, userId || 'user-anon', username || 'Khách may mắn', categoryId, categoryName, selected.code, ip || 'unknown', now]
     );
 
     // Mark referral as completed if bạn bè đủ điều kiện
@@ -450,22 +497,21 @@ export const db = {
     return { id, referrerId, referredId, completed: 0 };
   },
 
-  // Đánh dấu referral là hoàn thành khi bạn bè xem đủ video
+  // Đánh dấu referral là hoàn thành khi bạn bè xem đủ video & bốc code
   markReferralCompleted: async (referredId) => {
-    const settings = readSettings();
-    const minVideos = settings.referralMinVideos || 3;
-
-    // Đếm số video đã xem của referred user
-    const viewCount = await dbGet('SELECT COUNT(*) as cnt FROM ip_views WHERE user_id = ?', [String(referredId)]);
-    const totalViews = viewCount ? viewCount.cnt : 0;
-
-    if (totalViews >= minVideos) {
+    const existing = await dbGet('SELECT * FROM referrals WHERE referred_id = ? AND completed = 0', [String(referredId)]);
+    if (existing) {
       const now = new Date().toISOString();
       await dbRun(
         'UPDATE referrals SET completed = 1, completed_at = ? WHERE referred_id = ? AND completed = 0',
         [now, String(referredId)]
       );
+      return {
+        referrerId: existing.referrer_id,
+        referredUsername: existing.referred_username
+      };
     }
+    return null;
   },
 
   // Lấy thống kê referral của 1 user
