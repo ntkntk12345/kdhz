@@ -549,9 +549,45 @@ export function setupTelegramBot() {
 
       // 3. Admin Bấm Xóa Code
       if (data === 'admin_del_code') {
-        pendingState.set(chatId, { action: 'delete_single_code' });
+        const buttons = [
+          [{ text: '🔥 XÓA TOÀN BỘ KHO CODE (RỖNG 0 CODE)', callback_data: 'admin_del_all_codes' }],
+          [{ text: '🗑️ Xóa 1 mã code cụ thể', callback_data: 'admin_del_single_prompt' }],
+          [{ text: '🔙 Quay lại', callback_data: 'admin_home' }]
+        ];
         bot.editMessageText(
           `🗑️ <b>XÓA CODE KHỎI KHO:</b>\n\n` +
+          `Vui lòng chọn phương thức xóa bên dưới:`,
+          {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: buttons }
+          }
+        );
+        return;
+      }
+
+      // Xóa toàn bộ kho code
+      if (data === 'admin_del_all_codes') {
+        await db.deleteAllCodes();
+        bot.editMessageText(
+          `✅ <b>ĐÃ XÓA SẠCH TOÀN BỘ KHO CODE!</b>\n\n` +
+          `Kho Gifcode hiện tại đã hoàn toàn rỗng (0 code).`,
+          {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: [[{ text: '🔙 Quay lại Bảng Quản Trị', callback_data: 'admin_home' }]] }
+          }
+        );
+        return;
+      }
+
+      // Nhập mã code cụ thể để xóa
+      if (data === 'admin_del_single_prompt') {
+        pendingState.set(chatId, { action: 'delete_single_code' });
+        bot.editMessageText(
+          `🗑️ <b>XÓA 1 MÃ CODE CỤ THỂ:</b>\n\n` +
           `Vui lòng gửi mã code cụ thể bạn muốn xóa (Ví dụ: <code>CODE123</code>):`,
           {
             chat_id: chatId,

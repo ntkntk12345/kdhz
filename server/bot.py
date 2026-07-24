@@ -552,6 +552,25 @@ async def handle_callback_query(call):
         return
 
     if data == 'admin_del_code':
+        markup = types.InlineKeyboardMarkup([
+            [types.InlineKeyboardButton("🔥 XÓA TOÀN BỘ KHO CODE (RỖNG 0 CODE)", callback_data="admin_del_all_codes")],
+            [types.InlineKeyboardButton("🗑️ Xóa 1 mã code cụ thể", callback_data="admin_del_single_prompt")],
+            [types.InlineKeyboardButton("🔙 Quay lại", callback_data="admin_home")]
+        ])
+        await bot.edit_message_text("🗑️ <b>XÓA CODE KHỎI KHO:</b>\n\nVui lòng chọn phương thức xóa bên dưới:", chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+        return
+
+    if data == 'admin_del_all_codes':
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('DELETE FROM gifcodes')
+        conn.commit()
+        conn.close()
+        markup = types.InlineKeyboardMarkup([[types.InlineKeyboardButton("🔙 Quay lại Admin Panel", callback_data="admin_home")]])
+        await bot.edit_message_text("✅ <b>ĐÃ XÓA SẠCH TOÀN BỘ KHO CODE!</b>\n\nKho Gifcode hiện tại đã hoàn toàn rỗng (0 code).", chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+        return
+
+    if data == 'admin_del_single_prompt':
         pending_states[chat_id] = {'action': 'delete_code'}
         markup = types.InlineKeyboardMarkup([[types.InlineKeyboardButton("❌ Hủy", callback_data="admin_home")]])
         await bot.edit_message_text("🗑️ Gửi mã code cụ thể bạn muốn xóa (Ví dụ: <code>CODE123</code>):", chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)

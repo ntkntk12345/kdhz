@@ -124,24 +124,12 @@ const initDb = async () => {
       )
     `);
 
-    // Seed default categories if empty
+    // Default categories seed if empty
     const catCount = await dbGet('SELECT COUNT(*) as count FROM categories');
     if (catCount.count === 0) {
       await dbRun(`INSERT INTO categories (id, name, slug, active, icon, description) VALUES 
         ('cat-tanthu', 'Kho Code Tân Thủ', 'tanthu', 1, '🎁', 'Kho Code Tân Thủ - Gifcode trải nghiệm độc quyền')
       `);
-    }
-
-    // Seed default gifcodes if empty
-    const codeCount = await dbGet('SELECT COUNT(*) as count FROM gifcodes');
-    if (codeCount.count === 0) {
-      const now = new Date().toISOString();
-      await dbRun(`INSERT INTO gifcodes (id, category_id, code, is_used, created_at) VALUES 
-        ('code-1', 'cat-tanthu', 'TANTHU-NEWVIP-88K', 0, ?),
-        ('code-2', 'cat-tanthu', 'TANTHU-START999-50K', 0, ?),
-        ('code-3', 'cat-gifcode', 'GIFCODE-LUCKY777-100K', 0, ?),
-        ('code-4', 'cat-gifcode', 'GIFCODE-SUPER999-200K', 0, ?)
-      `, [now, now, now, now]);
     }
   } catch (err) {
     console.error('Error initializing SQLite tables:', err.message);
@@ -343,6 +331,11 @@ export const db = {
 
   deleteCode: async (codeId) => {
     await dbRun('DELETE FROM gifcodes WHERE id = ?', [codeId]);
+    return true;
+  },
+
+  deleteAllCodes: async () => {
+    await dbRun('DELETE FROM gifcodes');
     return true;
   },
 
