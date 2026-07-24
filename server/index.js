@@ -136,11 +136,8 @@ app.post('/api/ads/claim', async (req, res) => {
     const { categoryId, userId, username } = req.body;
     const ip = getClientIp(req);
 
-    if (!categoryId) {
-      return res.status(400).json({ success: false, message: 'Vui lòng chọn danh mục!' });
-    }
-
-    const result = await db.claimRandomCode(categoryId, userId, username, ip);
+    const targetCatId = categoryId || 'cat-tanthu';
+    const result = await db.claimRandomCode(targetCatId, userId, username, ip);
     if (!result.success) {
       return res.status(400).json(result);
     }
