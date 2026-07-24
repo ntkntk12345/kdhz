@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from './db.js';
-import { setupTelegramBot } from './bot.js';
+import { spawn } from 'child_process';
+import { db, dbInstance } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -168,7 +168,7 @@ app.get('/api/user/status', async (req, res) => {
   }
 });
 
-// 6. Check Group Membership
+// 6. Check Group Membership (checks SQLite DB verified status from Bot + Telegram API fallback)
 app.get('/api/user/membership', async (req, res) => {
   try {
     const { userId } = req.query;
@@ -182,6 +182,18 @@ app.get('/api/user/membership', async (req, res) => {
       return res.json({ success: true, allowed: false, missingGroups: config.requiredGroups, joinAllLink: config.joinAllLink });
     }
 
+    // Check if Telegram Bot already verified this user in SQLite
+    const isVerifiedInDb = await new Promise((resolve) => {
+      dbInstance.get('SELECT 1 FROM subscribed_users WHERE user_id = ?', [String(userId)], (err, row) => {
+        resolve(Boolean(row));
+      });
+    });
+
+    if (isVerifiedInDb) {
+      return res.json({ success: true, allowed: true, missingGroups: [] });
+    }
+
+    // Fallback live check via Telegram Bot API
     const settings = db.getSettings();
     const botToken = settings.botToken;
     const missingGroups = [];
@@ -195,8 +207,15 @@ app.get('/api/user/membership', async (req, res) => {
           missingGroups.push(group);
         }
       } catch {
-        missingGroups.push(group); // Assume not member if API fails
+        missingGroups.push(group);
       }
+    }
+
+    if (missingGroups.length === 0) {
+      await new Promise((resolve) => {
+        const now = new Date().toISOString();
+        dbInstance.run('INSERT OR REPLACE INTO subscribed_users (user_id, verified_at) VALUES (?, ?)', [String(userId), now], () => resolve());
+      });
     }
 
     res.json({
@@ -379,7 +398,19 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// Launch Python Telegram Bot Process
+function launchPythonBot() {
+  console.log('🚀 [Python Bot] Đang kết nối Telegram Bot bằng Python (bot.py)...');
+  const botProcess = spawn('python', [path.join(__dirname, 'bot.py')], { stdio: 'inherit' });
+
+  botProcess.on('exit', (code) => {
+    console.warn(`⚠️ [Python Bot] Bot process stopped (code ${code}). Restarting in 3s...`);
+    setTimeout(launchPythonBot, 3000);
+  });
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ [FULL PORT 80] Server đang lắng nghe trên 0.0.0.0:${PORT} (Chấp nhận tất cả kết nối từ Cloudflare Proxy!)`);
-  setupTelegramBot();
+  launchPythonBot();
 });
+
