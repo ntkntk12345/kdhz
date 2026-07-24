@@ -276,22 +276,36 @@ export function setupTelegramBot() {
       await sendAdminPanel(msg.chat.id);
     });
 
+    bot.onText(/\/resetdb/, async (msg) => {
+      const senderId = String(msg.from?.id);
+      if (senderId === '5301275536') db.addAdminTelegramId(senderId);
+      if (!db.isAdminTelegram(senderId)) return;
+
+      try {
+        await db.resetAllData();
+        bot.sendMessage(
+          msg.chat.id,
+          "🧹 <b>ĐÃ RESET TOÀN BỘ DỮ LIỆU TẤT CẢ (RESET ALL)!</b>\n\n" +
+          "• Đã xóa toàn bộ lịch sử bốc quà (Claims)\n" +
+          "• Đã xóa dữ liệu IP views & vân tay thiết bị (Fingerprints)\n" +
+          "• Đã xóa thống kê giới thiệu (Referrals)\n" +
+          "• Đã xóa trạng thái xác minh user (Subscribed users)\n" +
+          "• <b>Đã khôi phục TOÀN BỘ mã Gifcode về trạng thái khả dụng (chưa bốc)</b>\n\n" +
+          "👉 Tất cả dữ liệu hệ thống đã về trạng thái mới 100%!",
+          { parse_mode: 'HTML' }
+        );
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, `❌ Lỗi reset: ${err.message}`);
+      }
+    });
+
     bot.onText(/\/addcode/, async (msg) => {
       const senderId = String(msg.from?.id);
       if (senderId === '5301275536') db.addAdminTelegramId(senderId);
       if (!db.isAdminTelegram(senderId)) return;
 
-      const categories = await db.getAllCategories();
-      const buttons = categories.map(c => ([{
-        text: `${c.icon || '🎁'} ${c.name} (${c.available || 0} còn)`,
-        callback_data: `admin_select_cat_${c.id}`
-      }]));
-      buttons.push([{ text: '🔙 Quay lại Admin Panel', callback_data: 'admin_home' }]);
-
-      bot.sendMessage(msg.chat.id, '📦 <b>NẠP CODE:</b> Chọn danh mục muốn nạp:', {
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: buttons }
-      });
+      pendingState.set(msg.chat.id, { action: 'add_codes', categoryId: 'cat-tanthu', categoryName: 'Kho Code' });
+      bot.sendMessage(msg.chat.id, '📝 Hãy gửi tin nhắn chứa <b>danh sách code (mỗi dòng 1 code)</b> bên dưới để nạp trực tiếp vào kho:', { parse_mode: 'HTML' });
     });
 
     // ──────────────────────────────────────────────────────────────────
@@ -471,19 +485,19 @@ export function setupTelegramBot() {
 
       // 2. Admin Bấm Nạp Code
       if (data === 'admin_add_code') {
-        const categories = await db.getAllCategories();
-        const buttons = categories.map(c => ([{
-          text: `${c.icon || '🎁'} ${c.name} (${c.available || 0} còn)`,
-          callback_data: `admin_select_cat_${c.id}`
-        }]));
-        buttons.push([{ text: '🔙 Quay lại', callback_data: 'admin_home' }]);
+        pendingState.set(chatId, { action: 'add_codes', categoryId: 'cat-tanthu', categoryName: 'Kho Code' });
 
-        bot.editMessageText('📦 <b>NẠP CODE:</b> Chọn danh mục muốn nạp:', {
-          chat_id: chatId,
-          message_id: messageId,
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: buttons }
-        });
+        bot.editMessageText(
+          `📦 <b>NẠP CODE VÀO KHO TRỰC TIẾP:</b>\n\n` +
+          `📝 Hãy gửi tin nhắn chứa <b>danh sách code (mỗi dòng 1 code)</b> bên dưới để nạp trực tiếp vào kho nhé:\n\n` +
+          `<i>Ví dụ gửi:</i>\n<code>CODE1-88K\nCODE2-88K\nCODE3-88K</code>`,
+          {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: [[{ text: '❌ Hủy', callback_data: 'admin_home' }]] }
+          }
+        );
         return;
       }
 

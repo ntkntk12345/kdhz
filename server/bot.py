@@ -430,6 +430,7 @@ async def handle_resetdb(message):
     c.execute('DELETE FROM referrals')
     c.execute('DELETE FROM subscribed_users')
     c.execute('UPDATE users SET checked = 0')
+    c.execute('UPDATE gifcodes SET is_used = 0, used_by = NULL, used_at = NULL')
     conn.commit()
     conn.close()
 

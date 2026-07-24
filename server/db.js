@@ -369,37 +369,8 @@ export const db = {
   },
 
   checkIpClaimLimit: async (ip, userId) => {
-    if (!ip || ip === 'unknown' || ip === '127.0.0.1') {
-      return { canClaim: true };
-    }
-
-    const now = Date.now();
-    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
-
-    // Check if ANY other user account claimed a code from this IP in last 24h
-    const recentClaim = await dbGet(
-      'SELECT * FROM claims WHERE ip_address = ? AND user_id != ? ORDER BY claimed_at DESC LIMIT 1',
-      [ip, String(userId)]
-    );
-
-    if (recentClaim) {
-      const lastTime = new Date(recentClaim.claimed_at).getTime();
-      const elapsed = now - lastTime;
-
-      if (elapsed < cooldownMs) {
-        const remainingMs = cooldownMs - elapsed;
-        const remainingSeconds = Math.ceil(remainingMs / 1000);
-        const hours = Math.floor(remainingSeconds / 3600);
-        const minutes = Math.floor((remainingSeconds % 3600) / 60);
-        return {
-          canClaim: false,
-          reason: 'ip_duplicate',
-          message: `⚠️ Địa chỉ IP của bạn (${ip}) đã được tài khoản khác sử dụng để bốc Code hôm nay! (Giới hạn: 1 IP chỉ được bốc 1 Code / 24h). Vui lòng thử lại sau ${hours}h ${minutes}m.`,
-          remainingMs
-        };
-      }
-    }
-
+    // Mobile 4G/5G carrier IPs & Cloudflare proxy IPs are shared across users
+    // Telegram User ID is already strictly enforced for 24h limit
     return { canClaim: true };
   },
 
@@ -630,6 +601,16 @@ export const db = {
   },
 
   // ─── ADMIN STATS ─────────────────────────────────────────────────────────────
+
+  resetAllData: async () => {
+    await dbRun('DELETE FROM fingerprints');
+    await dbRun('DELETE FROM ip_views');
+    await dbRun('DELETE FROM claims');
+    await dbRun('DELETE FROM referrals');
+    await dbRun('DELETE FROM subscribed_users');
+    await dbRun('UPDATE gifcodes SET is_used = 0, used_by = NULL, used_at = NULL');
+    return true;
+  },
 
   getAdminStats: async () => {
     const categories = await dbAll('SELECT * FROM categories');

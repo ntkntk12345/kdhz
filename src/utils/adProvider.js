@@ -18,6 +18,18 @@ export async function playRewardedAd(stepIndex = 1, userId = null) {
     tgUserId = String(userId);
   }
 
+  // Explicit Test simulation ONLY when requested via ?test=1 or TEST_MODE=true in localStorage
+  const isExplicitTestMode = typeof window !== 'undefined' && (
+    localStorage.getItem('TEST_MODE') === 'true' ||
+    window.location.search.includes('test=1')
+  );
+
+  if (isExplicitTestMode) {
+    console.log(`🧪 [EXPLICIT TEST MODE] Simulating ad completion for Step ${stepIndex}...`);
+    await new Promise(resolve => setTimeout(resolve, 800));
+    return { success: true, provider: 'simulation', stepIndex };
+  }
+
   // Steps 1, 2, 3: Adsgram Network (numeric blockId + userId)
   if (stepIndex >= 1 && stepIndex <= 3) {
     const blockId = (stepIndex === 2) ? '39427' : '39426';
@@ -72,9 +84,17 @@ export async function playRewardedAd(stepIndex = 1, userId = null) {
       try {
         console.log(`🎬 [Monetag] Launching ad for Step ${stepIndex}/5 (user: ${tgUserId})...`);
 
-        const result = await window.show_11375549({
-          ymid: tgUserId || undefined
-        });
+        let result;
+        if (tgUserId) {
+          try {
+            result = await window.show_11375549({ ymid: String(tgUserId) });
+          } catch (e) {
+            console.warn('⚠️ Monetag call with ymid threw, executing fallback show():', e);
+            result = await window.show_11375549();
+          }
+        } else {
+          result = await window.show_11375549();
+        }
 
         console.log(`✅ [Monetag] Ad completed for Step ${stepIndex}:`, result);
         return { success: true, provider: 'monetag', zone: '11375549', stepIndex, details: result };

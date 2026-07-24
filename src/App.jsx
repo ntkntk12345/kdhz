@@ -59,11 +59,27 @@ export default function App() {
       setTgUser(parsedUser);
     }
 
+    // Check for ?reset=1 query parameter to auto reset web cache
+    if (typeof window !== 'undefined' && window.location.search.includes('reset=1')) {
+      localStorage.clear();
+    }
+
     // 2. Fetch categories, settings, recent claims
     fetchCategories();
     fetchSettings();
     fetchRecentClaims();
   }, []);
+
+  const handleResetWebState = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+    }
+    setVideoStep(1);
+    setInterAdCooldown(0);
+    setCooldownMs(0);
+    triggerHaptic('success');
+    alert('🧹 Đã xóa toàn bộ bộ nhớ tạm (Cache/LocalStorage) trên Web!\n\nTiến trình xem video đã được đặt lại từ Bước 1/5.');
+  };
 
   const userId = tgUser ? String(tgUser.id) : 'user-web';
 
@@ -442,6 +458,25 @@ export default function App() {
             <User size={13} />
             <span>{displayName}</span>
           </div>
+          <button 
+            onClick={handleResetWebState}
+            title="Reset tiến trình Web / Xóa Cache"
+            style={{
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#f87171',
+              borderRadius: '8px',
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            🔄 <span>Reset</span>
+          </button>
         </div>
       </header>
 
