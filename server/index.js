@@ -25,25 +25,35 @@ function getClientIp(req) {
     || 'unknown';
 }
 
-// ─── SECURITY MIDDLEWARE ──────────────────────────────────────────────────────
+// ─── STRICT SECURITY MIDDLEWARE (403 FORBIDDEN FOR ALL CODE/JSON/DB FILES) ───
 app.use((req, res, next) => {
-  const lowerUrl = req.url.toLowerCase();
+  const lowerUrl = req.url.toLowerCase().split('?')[0];
 
-  const isForbiddenFile =
-    lowerUrl.includes('/server/') ||
+  const isForbidden =
+    lowerUrl.endsWith('.json') ||
     lowerUrl.endsWith('.sqlite') ||
     lowerUrl.endsWith('.sqlite3') ||
     lowerUrl.endsWith('.db') ||
     lowerUrl.endsWith('.env') ||
     lowerUrl.endsWith('.py') ||
-    lowerUrl.includes('settings.json') ||
-    lowerUrl.includes('data.json') ||
-    lowerUrl.includes('.git');
+    (lowerUrl.endsWith('.js') && !lowerUrl.includes('/assets/')) ||
+    lowerUrl.endsWith('.jsx') ||
+    lowerUrl.endsWith('.ts') ||
+    lowerUrl.endsWith('.tsx') ||
+    lowerUrl.endsWith('.sh') ||
+    lowerUrl.endsWith('.bat') ||
+    lowerUrl.endsWith('.md') ||
+    lowerUrl.endsWith('.yml') ||
+    lowerUrl.endsWith('.yaml') ||
+    lowerUrl.includes('/server/') ||
+    lowerUrl.includes('/src/') ||
+    lowerUrl.includes('/.git') ||
+    lowerUrl.includes('/node_modules/');
 
-  if (isForbiddenFile) {
+  if (isForbidden) {
     return res.status(403).json({
       error: '403 Forbidden',
-      message: 'Access Denied: Direct file access and database downloads are strictly forbidden.'
+      message: 'Access Denied: Direct source code, json files, and database access are strictly forbidden.'
     });
   }
 

@@ -59,27 +59,11 @@ export default function App() {
       setTgUser(parsedUser);
     }
 
-    // Check for ?reset=1 query parameter to auto reset web cache
-    if (typeof window !== 'undefined' && window.location.search.includes('reset=1')) {
-      localStorage.clear();
-    }
-
     // 2. Fetch categories, settings, recent claims
     fetchCategories();
     fetchSettings();
     fetchRecentClaims();
   }, []);
-
-  const handleResetWebState = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.clear();
-    }
-    setVideoStep(1);
-    setInterAdCooldown(0);
-    setCooldownMs(0);
-    triggerHaptic('success');
-    alert('🧹 Đã xóa toàn bộ bộ nhớ tạm (Cache/LocalStorage) trên Web!\n\nTiến trình xem video đã được đặt lại từ Bước 1/5.');
-  };
 
   const userId = tgUser ? String(tgUser.id) : 'user-web';
 
@@ -458,25 +442,6 @@ export default function App() {
             <User size={13} />
             <span>{displayName}</span>
           </div>
-          <button 
-            onClick={handleResetWebState}
-            title="Reset tiến trình Web / Xóa Cache"
-            style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#f87171',
-              borderRadius: '8px',
-              padding: '4px 8px',
-              fontSize: '11px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            🔄 <span>Reset</span>
-          </button>
         </div>
       </header>
 
@@ -606,41 +571,6 @@ export default function App() {
                   {codeStats.used} <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>mã</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Referral Card */}
-          <div className="crafted-card">
-            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--accent-amber-light)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <Users size={16} />
-              <span>MỜI BẠN BÈ - NHẬN THÊM GIFCODE</span>
-            </div>
-
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '12px' }}>
-              Mời <b>3 người bạn</b> tham gia & xem đủ video → Nhận ngay 1 Gifcode thưởng (không tốn lượt 24h)!
-            </p>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ flex: 1, background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '8px 12px', fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                https://t.me/Gg88gk88_bot?start=ref_{userId}
-              </div>
-              <button
-                onClick={handleCopyRefLink}
-                className="btn-primary-crafted"
-                style={{ padding: '8px 14px', fontSize: '12px', whiteSpace: 'nowrap' }}
-              >
-                {copiedRefLink ? <Check size={14} /> : <Copy size={14} />}
-                <span>{copiedRefLink ? 'Đã chép' : 'Sao chép'}</span>
-              </button>
-            </div>
-
-            {/* Progress bar for referrals */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
-              <span>Đã hoàn thành: <b>{refStats.completed}</b> / {refStats.rewardCount} người</span>
-              <span>Đã thưởng: <b>{refStats.rewardsEarned}</b> code</span>
-            </div>
-            <div className="progress-track" style={{ height: '6px' }}>
-              <div className="progress-fill-bar" style={{ width: `${Math.min(100, (refStats.completed % refStats.rewardCount) / refStats.rewardCount * 100)}%` }} />
             </div>
           </div>
 
