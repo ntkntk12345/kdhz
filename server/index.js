@@ -67,11 +67,12 @@ function requireAdminToken(req, res, next) {
 
 // ─── PUBLIC API ENDPOINTS ─────────────────────────────────────────────────────
 
-// 1. Get Active Categories with code count summary
+// 1. Get Active Categories with code count summary & overall code stats
 app.get('/api/categories', async (req, res) => {
   try {
     const categories = await db.getCategories();
     const counts = await db.getCodeCounts();
+    const globalStats = await db.getTotalCodeStats();
 
     const result = categories.map(cat => ({
       ...cat,
@@ -79,7 +80,13 @@ app.get('/api/categories', async (req, res) => {
       totalCodes: counts[cat.id]?.total || 0
     }));
 
-    res.json({ success: true, categories: result });
+    res.json({
+      success: true,
+      categories: result,
+      totalAvailable: globalStats.available,
+      totalAll: globalStats.total,
+      totalUsed: globalStats.used
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

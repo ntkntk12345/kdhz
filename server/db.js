@@ -392,6 +392,14 @@ export const db = {
     return { canClaim: true };
   },
 
+  getTotalCodeStats: async () => {
+    const availRow = await dbGet('SELECT COUNT(*) as available FROM gifcodes WHERE is_used = 0');
+    const totalRow = await dbGet('SELECT COUNT(*) as total FROM gifcodes');
+    const available = availRow ? availRow.available : 0;
+    const total = totalRow ? totalRow.total : 0;
+    return { available, total, used: total - available };
+  },
+
   claimRandomCode: async (categoryId, userId, username, ip = 'unknown') => {
     // 1. Validate 24h user cooldown
     if (userId && userId !== 'user-web') {
@@ -421,10 +429,17 @@ export const db = {
       }
     }
 
-    // 3. Find available unused code from SQLite
-    const availableCodes = await dbAll('SELECT * FROM gifcodes WHERE category_id = ? AND is_used = 0', [categoryId]);
+    // 3. Find available unused code from SQLite (Search specified category first, fallback to ANY unused code in database)
+    let availableCodes = [];
+    if (categoryId) {
+      availableCodes = await dbAll('SELECT * FROM gifcodes WHERE category_id = ? AND is_used = 0', [categoryId]);
+    }
     if (!availableCodes || availableCodes.length === 0) {
-      return { success: false, message: 'Đã hết Gifcode cho mục này! Vui lòng quay lại sau.' };
+      availableCodes = await dbAll('SELECT * FROM gifcodes WHERE is_used = 0');
+    }
+
+    if (!availableCodes || availableCodes.length === 0) {
+      return { success: false, message: 'Kho Gifcode hiện tại đã hết! Vui lòng quay lại sau khi BQT nạp thêm code mới.' };
     }
 
     const randomIndex = Math.floor(Math.random() * availableCodes.length);
@@ -436,14 +451,14 @@ export const db = {
       userId || 'Anonymous', now, selected.id
     ]);
 
-    const category = await dbGet('SELECT * FROM categories WHERE id = ?', [categoryId]);
-    const categoryName = category ? category.name : 'Tân Thủ';
+    const category = await dbGet('SELECT * FROM categories WHERE id = ?', [selected.category_id]);
+    const categoryName = category ? category.name : 'Code Tân Thủ';
 
     // Record claim in SQLite with IP address
     const claimId = `claim-${Date.now()}`;
     await dbRun(
       'INSERT INTO claims (id, user_id, username, category_id, category_name, code, ip_address, claimed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [claimId, userId || 'user-anon', username || 'Khách may mắn', categoryId, categoryName, selected.code, ip || 'unknown', now]
+      [claimId, userId || 'user-anon', username || 'Khách may mắn', selected.category_id || 'cat-tanthu', categoryName, selected.code, ip || 'unknown', now]
     );
 
     // Mark referral as completed if bạn bè đủ điều kiện
@@ -455,7 +470,7 @@ export const db = {
       id: claimId,
       userId: userId || 'user-anon',
       username: username || 'Khách may mắn',
-      categoryId,
+      categoryId: selected.category_id,
       categoryName,
       code: selected.code,
       claimedAt: now
