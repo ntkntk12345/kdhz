@@ -193,6 +193,26 @@ app.post('/api/ads/view', async (req, res) => {
   }
 });
 
+// 3.1 Adsgram Webhook / Postback Endpoint for Server-to-Server reward verification
+app.get('/api/adsgram/postback', async (req, res) => {
+  try {
+    const { userId, userid, user_id, blockId, block_id, reward } = req.query;
+    const targetUserId = userId || userid || user_id;
+
+    console.log(`📡 [Adsgram Postback Received] userId: ${targetUserId}, blockId: ${blockId || block_id}, reward: ${reward}`);
+
+    if (targetUserId) {
+      // Record ad view from Adsgram server
+      await db.recordIpView('adsgram-postback', String(targetUserId), 1);
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('❌ [Adsgram Postback Error]:', err);
+    res.status(500).send('ERROR');
+  }
+});
+
 // 4. Get User / Recent Claims
 app.get('/api/claims', async (req, res) => {
   try {
