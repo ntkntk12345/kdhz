@@ -528,19 +528,20 @@ async def handle_callback_query(call):
         return
 
     if data == 'admin_add_code':
-        conn = get_db()
-        c = conn.cursor()
-        c.execute('SELECT * FROM categories')
-        cats = c.fetchall()
-        conn.close()
-
-        buttons = []
-        for cat in cats:
-            buttons.append([types.InlineKeyboardButton(f"{cat['icon']} {cat['name']}", callback_data=f"admin_sel_cat_{cat['id']}")])
-        buttons.append([types.InlineKeyboardButton("🔙 Quay lại", callback_data="admin_home")])
-
-        markup = types.InlineKeyboardMarkup(buttons)
-        await bot.edit_message_text("📦 <b>NẠP CODE:</b> Chọn danh mục cần nạp:", chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+        pending_states[chat_id] = {'action': 'add_codes', 'category_id': 'cat-tanthu'}
+        markup = types.InlineKeyboardMarkup([[types.InlineKeyboardButton("❌ Hủy", callback_data="admin_home")]])
+        await bot.edit_message_text(
+            "📦 <b>NẠP CODE VÀO KHO TRỰC TIẾP:</b>\n\n"
+            "📝 Hãy gửi tin nhắn chứa <b>danh sách code (mỗi dòng 1 code)</b> bên dưới để nạp trực tiếp vào kho nhé:\n\n"
+            "<i>Ví dụ gửi:</i>\n"
+            "<code>CODE88K-001\n"
+            "CODE88K-002\n"
+            "CODE88K-003</code>",
+            chat_id=chat_id,
+            message_id=message_id,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
         return
 
     if data.startswith('admin_sel_cat_'):

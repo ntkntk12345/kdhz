@@ -128,8 +128,7 @@ const initDb = async () => {
     const catCount = await dbGet('SELECT COUNT(*) as count FROM categories');
     if (catCount.count === 0) {
       await dbRun(`INSERT INTO categories (id, name, slug, active, icon, description) VALUES 
-        ('cat-tanthu', 'Tân Thủ', 'tanthu', 1, '🔰', 'Tân Thủ GIFCODE - Code trải nghiệm độc quyền cho thành viên mới'),
-        ('cat-gifcode', 'GIFCODE', 'gifcode', 1, '🎁', 'GIFCODE VIP - Thưởng Gifcode ngẫu nhiên 50K - 500K')
+        ('cat-tanthu', 'Kho Code Tân Thủ', 'tanthu', 1, '🎁', 'Kho Code Tân Thủ - Gifcode trải nghiệm độc quyền')
       `);
     }
 
