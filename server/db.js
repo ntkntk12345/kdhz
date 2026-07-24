@@ -74,9 +74,21 @@ const initDb = async () => {
         category_id TEXT,
         category_name TEXT,
         code TEXT,
+        ip_address TEXT,
         claimed_at TEXT NOT NULL
       )
     `);
+
+    // Auto-migrate claims table to add ip_address column if missing
+    try {
+      const columns = await dbAll('PRAGMA table_info(claims)');
+      const hasIpCol = columns.some(c => c.name === 'ip_address');
+      if (!hasIpCol) {
+        await dbRun('ALTER TABLE claims ADD COLUMN ip_address TEXT');
+      }
+    } catch (e) {
+      console.warn('Claims table migration check note:', e);
+    }
 
     // Referral tracking table
     await dbRun(`

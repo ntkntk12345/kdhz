@@ -152,7 +152,8 @@ app.post('/api/ads/claim', async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('❌ [Claim Endpoint Error]:', err);
+    res.status(500).json({ success: false, message: err.message || 'Lỗi xử lý server!', error: err.message });
   }
 });
 
