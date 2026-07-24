@@ -352,18 +352,6 @@ export default function App() {
     return <TelegramOnlyGuard />;
   }
 
-  // Enforce Mandatory Group Membership Gate
-  if (!membershipAllowed) {
-    return (
-      <MembershipGate
-        missingGroups={missingGroups}
-        joinAllLink={joinAllLink}
-        onRecheck={checkMembership}
-        isChecking={isCheckingMembership}
-      />
-    );
-  }
-
   return (
     <>
       {/* Top Announcement Marquee Bar */}

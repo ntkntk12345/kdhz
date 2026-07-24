@@ -168,65 +168,13 @@ app.get('/api/user/status', async (req, res) => {
   }
 });
 
-// 6. Check Group Membership (checks SQLite DB verified status from Bot + Telegram API fallback)
-app.get('/api/user/membership', async (req, res) => {
-  try {
-    const { userId } = req.query;
-    const config = db.getMembershipConfig();
-
-    if (!config.requiredGroups || config.requiredGroups.length === 0) {
-      return res.json({ success: true, allowed: true, missingGroups: [] });
-    }
-
-    if (!userId) {
-      return res.json({ success: true, allowed: false, missingGroups: config.requiredGroups, joinAllLink: config.joinAllLink });
-    }
-
-    // Check if Telegram Bot already verified this user in SQLite
-    const isVerifiedInDb = await new Promise((resolve) => {
-      dbInstance.get('SELECT 1 FROM subscribed_users WHERE user_id = ?', [String(userId)], (err, row) => {
-        resolve(Boolean(row));
-      });
-    });
-
-    if (isVerifiedInDb) {
-      return res.json({ success: true, allowed: true, missingGroups: [] });
-    }
-
-    // Fallback live check via Telegram Bot API
-    const settings = db.getSettings();
-    const botToken = settings.botToken;
-    const missingGroups = [];
-
-    for (const group of config.requiredGroups) {
-      try {
-        const resp = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${encodeURIComponent(group)}&user_id=${userId}`);
-        const data = await resp.json();
-        const status = data?.result?.status;
-        if (!status || !['member', 'administrator', 'creator'].includes(status)) {
-          missingGroups.push(group);
-        }
-      } catch {
-        missingGroups.push(group);
-      }
-    }
-
-    if (missingGroups.length === 0) {
-      await new Promise((resolve) => {
-        const now = new Date().toISOString();
-        dbInstance.run('INSERT OR REPLACE INTO subscribed_users (user_id, verified_at) VALUES (?, ?)', [String(userId), now], () => resolve());
-      });
-    }
-
-    res.json({
-      success: true,
-      allowed: missingGroups.length === 0,
-      missingGroups,
-      joinAllLink: config.joinAllLink
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+// 6. Check Group Membership (Bot handles channel verification)
+app.get('/api/user/membership', (req, res) => {
+  res.json({
+    success: true,
+    allowed: true,
+    missingGroups: []
+  });
 });
 
 // 7. Referral stats for a user
