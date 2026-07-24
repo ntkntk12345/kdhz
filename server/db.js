@@ -491,6 +491,8 @@ export const db = {
       'INSERT INTO ip_views (id, ip, user_id, step, viewed_at) VALUES (?, ?, ?, ?, ?)',
       [id, ip, String(userId), step || 1, now]
     );
+    // Automatically trigger referral completion check
+    await db.markReferralCompleted(userId);
   },
 
   // Kiểm tra IP có bị chặn không

@@ -237,20 +237,39 @@ export default function App() {
     }
 
     // 1. Try real ad SDK (Adsgram / Monetag)
-    const adResult = await playRewardedAd(videoStep);
+    const adResult = await playRewardedAd(videoStep, userId);
     setIsAdLoading(false);
 
     if (adResult.success) {
       // Real ad SDK resolved successfully
       await handleAdStepComplete();
     } else {
-      // Fallback to built-in video player modal
+      // If Adsgram was skipped or closed early by the user
+      if (adResult.provider === 'adsgram' && adResult.error && adResult.error !== 'SDK_NOT_LOADED') {
+        triggerHaptic('warning');
+        alert('Vui lòng xem hết quảng cáo Adsgram để nhận tính điểm và bốc Gifcode!');
+        return;
+      }
+      // Fallback to built-in video player modal if SDK not active/available in environment
       setShowAdModal(true);
     }
   };
 
   // Callback when user completes video ad in modal
   const handleAdStepComplete = async () => {
+    // Record video step completion on server for referral tracking & security
+    try {
+      const fp = getBrowserFingerprint();
+      await fetch('/api/ads/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, step: videoStep, fingerprint: fp })
+      });
+      fetchReferralStats();
+    } catch (e) {
+      console.warn('Error recording ad step completion:', e);
+    }
+
     if (videoStep < 5) {
       // Completed Video 1/5, 2/5, 3/5, 4/5 → start 15s inter-ad rest
       setShowAdModal(false);

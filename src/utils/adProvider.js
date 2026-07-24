@@ -9,29 +9,54 @@
 
 export const ADSGRAM_BLOCKS = ['39426', '39427'];
 
-export async function playRewardedAd(stepIndex = 1) {
-  // Steps 1, 2, 3: Adsgram Network (numeric blockId — no int- prefix)
+export async function playRewardedAd(stepIndex = 1, userId = null) {
+  // Extract Telegram User ID for Adsgram reward tracking & payout attribution
+  let tgUserId = userId;
+  if ((!tgUserId || tgUserId === 'user-web') && typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+    tgUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  }
+
+  // Steps 1, 2, 3: Adsgram Network (numeric blockId + userId)
   if (stepIndex >= 1 && stepIndex <= 3) {
     const blockId = (stepIndex === 2) ? '39427' : '39426';
 
     if (typeof window !== 'undefined' && window.Adsgram) {
       try {
-        console.log(`🎬 [Adsgram] Launching blockId "${blockId}" for Step ${stepIndex}/5...`);
+        console.log(`🎬 [Adsgram] Launching blockId "${blockId}" for Telegram userId: "${tgUserId}" (Step ${stepIndex}/5)...`);
         
-        const AdController = window.Adsgram.init({ blockId, debug: false });
+        const initParams = {
+          blockId: String(blockId),
+          debug: false
+        };
+
+        // CRITICAL: userId is required by Adsgram to credit earnings to publisher account!
+        if (tgUserId) {
+          initParams.userId = String(tgUserId);
+        }
+
+        const AdController = window.Adsgram.init(initParams);
         const result = await AdController.show();
         
-        console.log(`✅ [Adsgram] Ad completed for Step ${stepIndex}:`, result);
+        console.log(`✅ [Adsgram] Ad completed successfully for Step ${stepIndex}:`, result);
         return { success: true, provider: 'adsgram', blockId, stepIndex, details: result };
       } catch (err) {
-        console.warn(`❌ [Adsgram] Step ${stepIndex} (${blockId}) skipped or error:`, err);
+        console.warn(`❌ [Adsgram] Step ${stepIndex} (${blockId}) error or skipped:`, err);
+        return { 
+          success: false, 
+          provider: 'adsgram', 
+          blockId, 
+          stepIndex, 
+          error: err,
+          message: typeof err === 'string' ? err : (err?.description || err?.message || 'Quảng cáo bị bỏ qua hoặc lỗi tải')
+        };
       }
     } else {
       console.warn('⚠️ window.Adsgram SDK not detected on window context');
+      return { success: false, provider: 'adsgram', error: 'SDK_NOT_LOADED' };
     }
   }
 
-  // Steps 4, 5: Monetag Network — inApp interstitial (NOT pop/directlink)
+  // Steps 4, 5: Monetag Network — Single-play inApp Interstitial
   if (stepIndex >= 4 && stepIndex <= 5) {
     if (typeof window !== 'undefined' && typeof window.show_11375549 === 'function') {
       try {
@@ -40,11 +65,11 @@ export async function playRewardedAd(stepIndex = 1) {
         await window.show_11375549({
           type: 'inApp',
           inAppSettings: {
-            frequency: 1,
-            capping: 0,
-            interval: 0,
+            frequency: 24,
+            capping: 1,
+            interval: 60,
             timeout: 5,
-            everyPage: true
+            everyPage: false
           }
         });
 
@@ -52,12 +77,14 @@ export async function playRewardedAd(stepIndex = 1) {
         return { success: true, provider: 'monetag', zone: '11375549', stepIndex };
       } catch (err) {
         console.warn(`❌ [Monetag] Step ${stepIndex} error:`, err);
+        return { success: false, provider: 'monetag', error: err };
       }
     } else {
       console.warn('⚠️ window.show_11375549 Monetag SDK not detected on window object');
+      return { success: false, provider: 'monetag', error: 'SDK_NOT_LOADED' };
     }
   }
 
-  // Fallback to internal video player modal if real SDK is skipped or unavailable
   return { success: false, fallbackRequired: true };
 }
+
